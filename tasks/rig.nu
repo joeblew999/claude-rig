@@ -133,7 +133,7 @@ def main [
   if $logged_in {
     session-step
   } else {
-    skip "always-on session: needs the login first"
+    skipped "always-on session: needs the login first"
   }
 
   if (dry-run) {
