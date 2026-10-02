@@ -10,13 +10,14 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 |---|---|
 | Capture the Mac's Claude config into `claude/` | This Mac |
 | Bootstrap for macOS and Linux, one line with `curl` | CI on fresh macOS and Ubuntu (x64, ARM64); Ubuntu and Debian containers; this Mac |
-| Bootstrap for Windows, using winget for git and mise | CI on fresh Windows Server x64 and Windows 11 ARM64. Not yet on a real desktop PC |
+| Bootstrap for Windows, using winget for git and mise | CI on fresh Windows Server x64 and Windows 11 ARM64, and a fresh Windows 11 ARM64 VM in UTM (a clone of the irgo-winvm golden image) |
 | Tasks in nushell, one implementation for every OS | CI on all five runners |
 | `--dry-run` that changes nothing, even on a bare machine | CI on all five runners |
 | Login step: `claude auth login` with a claude.ai account | This Mac (already logged in). The login prompt itself has not been run on a new machine |
 | Always-on session under pitchfork, back after a reboot | This Mac: starts, shows in the Claude app, the rig restarts it when stopped. Not rebooted. Linux is the same code, not yet run on a real Linux machine with a login |
 | Always-on session on Windows, started at sign-in | CI on Windows x64 and ARM64 checks the sign-in entry and the restart loop. The runner cannot log in, so the server connecting is not tested: that needs a real Windows machine |
-| `push`: rig a remote machine over SSH from the Mac | Ubuntu containers over SSH: dry run, real run, second run. Not tested against Windows or macOS, or a machine whose sudo asks for a password |
+| `push`: rig a remote machine over SSH from the Mac | Ubuntu containers over SSH, and the Windows 11 ARM64 VM in UTM set up like the office PC (OpenSSH Server, key in `administrators_authorized_keys`, cmd as the shell): dry run, real run from nothing, second run with no changes. Not tested against macOS, or a machine whose sudo asks for a password |
+| One-line bootstrap on a real Linux machine with systemd | A fresh Ubuntu 24.04 VM in OrbStack. It stops at the login step, as designed |
 | AGENTS.md and this backlog | |
 
 ## Next
@@ -25,8 +26,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 |---|---|
 | Rig the office Windows PC | It has an old Claude install and winget packages to look at first. Blocked on turning on OpenSSH Server there and its user name and address |
 | First real Windows login and session | Everything on Windows is tested only on CI runners, which cannot log in. The office PC is the first real test: the login prompt, the work folder approval, and the session showing up in the Claude app |
-| `push` to a Windows machine | The command line for Windows is written but has never met a real Windows host. `push` also needs an SSH key on the machine; a password-only PC needs the key added first |
-| Run the session on a real Linux machine | Needs a Linux machine or UTM VM with systemd, and one login |
+| Finish the two test VMs | The Linux VM (OrbStack) and the Windows VM (UTM) are rigged and waiting at the login prompt. With the owner's two codes: test the session on each, then reboot each |
 | Reboot test on each OS | Confirms the session comes back by itself |
 | Make enrolling a machine as easy as possible | Today: one line on the machine, or `push` from the Mac, plus one login (open a link, paste a code). See "needs owner" for removing the login |
 | `doctor --json` | `mise run doctor` is the dry run today. JSON output is the shape a control plane will take in |
@@ -38,6 +38,19 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | Log every machine in from one captured secret | Remote Control needs a full claude.ai login. A `claude setup-token` token cannot do it (Claude's docs say so). Copying the Mac's own login to other machines is not documented, and those logins refresh themselves, so one copy may log out the others, including the Mac. Recommended: each machine logs in once, about 30 seconds. If you want the copy tried, it should be on a spare machine, accepting that the Mac may need to log in again |
 | What a machine may do without asking | The Mac's settings (`bypassPermissions`) are applied to every machine. That is right for a VM or a dedicated worker. Say if some machines should be stricter |
 | Should this Mac stay an always-on worker | It is one now, as the test. To turn it off: `pitchfork stop claude-rig`, then remove `[daemons.claude-rig]` from `~/.config/pitchfork/config.toml` |
+
+## The UTM repo (irgo-windows-vm)
+
+The owner has put this repo in the lead's hands too, and wants the two to fit together with no loose ends. Found while using it to test the rig:
+
+| Item | Notes |
+|---|---|
+| Recover when the UTM app is closed or hung | `vm-create` cloned fine, then failed to boot with `AppleEvent timed out (-1712)` because UTM had been closed down and was not answering. Quitting and reopening UTM fixed it. The tool should notice and restart UTM itself, since no VM is running at that point |
+| Formalise SSH into a VM | The rig's tests needed SSH in the guest. It was turned on by hand: a small program run through `app-create` that installs OpenSSH Server, opens the firewall and adds a key. That should be a command (or part of the golden image) so any agent can do it |
+| A command that runs a shell command in the guest and returns the output | `utmctl exec` returns neither output nor exit code. `app-create` does, but only for an `.exe` |
+| Linux VMs | The owner wants Linux in UTM too, done properly. Today the tool is Windows only; the rig's Linux test machine is an OrbStack VM |
+| Run the rig before sealing the golden image | Plan step 6: every clone then starts as a rigged machine, and only needs its login |
+| Releases | The owner wants releases pushed for both repos, when the lead judges them ready |
 
 ## Later
 
