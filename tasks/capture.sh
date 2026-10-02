@@ -11,7 +11,6 @@ DEST="$REPO/claude"
 
 # What gets captured. Everything else in ~/.claude (projects, todos, logs,
 # login state in ~/.claude.json) is machine-local and never copied.
-FILES=(CLAUDE.md settings.json)
 DIRS=(skills agents commands hooks)
 
 die() { echo "capture: $*" >&2; exit 1; }
