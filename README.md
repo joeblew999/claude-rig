@@ -65,6 +65,10 @@ mise run capture
 
 This copies the Mac's `~/.claude` settings and skills into `claude/`. Commit the result, and every machine picks it up on its next run.
 
+## Licence
+
+[MIT](LICENSE).
+
 ## Credits
 
 `claude/skills/mise-configuration` and `claude/skills/mise-tasks` come from [terrylica/cc-skills](https://github.com/terrylica/cc-skills) (MIT).

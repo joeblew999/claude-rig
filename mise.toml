@@ -30,9 +30,13 @@ run = "nu tasks/capture.nu"
 description = "Rig a remote machine over SSH: mise run push user@host. Pass --dry-run to only look."
 run = "nu tasks/push.nu"
 
+[tasks.test]
+description = "Run the tests: the config merge against throwaway Claude folders"
+run = "nu tests/apply.nu"
+
 [tasks.lint]
 description = "Check the scripts"
 run = [
   "shellcheck bootstrap.sh",
-  "nu --commands 'for f in (glob tasks/*.nu) { nu-check --debug $f }'",
+  "nu --commands 'for f in (glob tasks/*.nu | append (glob tests/*.nu)) { nu-check --debug $f }'",
 ]

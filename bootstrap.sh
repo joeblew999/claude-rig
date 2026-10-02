@@ -140,7 +140,11 @@ if [ -n "$here" ] && [ -f "$here/tasks/rig.nu" ]; then
   say "ok       rig checkout at $RIG_DIR"
 elif [ "$DRY_RUN" = 1 ]; then
   # Look at the rig without leaving a clone behind.
-  would "keep a clone of the rig in $RIG_DIR"
+  if [ -d "$RIG_DIR/.git" ]; then
+    say "ok       rig clone at $RIG_DIR (a real run brings it up to date)"
+  else
+    would "keep a clone of the rig in $RIG_DIR"
+  fi
   if ! have git; then
     would "then install nushell, the tools, Claude Code and the Claude config"
     say "dry run finished. Nothing was changed."

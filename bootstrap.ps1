@@ -128,7 +128,11 @@ function Invoke-Bootstrap {
         Invoke-Rig $PSScriptRoot
     } elseif ($DryRun) {
         # Look at the rig without leaving a clone behind.
-        Would "keep a clone of the rig in $rigDir"
+        if (Test-Path (Join-Path $rigDir '.git')) {
+            Say "ok       rig clone at $rigDir (a real run brings it up to date)"
+        } else {
+            Would "keep a clone of the rig in $rigDir"
+        }
         if (-not (Have git)) {
             Would 'then install nushell, the tools, Claude Code and the Claude config'
             Say 'dry run finished. Nothing was changed.'
