@@ -34,6 +34,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | First real Windows login and session | Everything on Windows is tested only on CI runners, which cannot log in. The office PC is the first real test: the login prompt, the work folder approval, and the session showing up in the Claude app |
 | Finish the two test VMs | The Linux VM (OrbStack) and the Windows VM (UTM) are rigged and waiting at the login prompt. With the owner's two codes: test the session on each, then reboot each |
 | Reboot test on macOS and Linux | Windows is done (see above). The Mac has not been rebooted, and the Linux VM has no session until it is logged in |
+| Scale work out across the fleet | The owner asked whether Claude, given work, will spread it over the machines. Not by itself: one session runs on one machine, and nothing found says Claude splits a task across them. So build it: a `dispatch` command that lets a lead Claude hand separate pieces of work to different machines over SSH (`claude -p` in each machine's work folder) and collect the results. Needs each machine logged in before it can be tested beyond the Mac |
 | Make enrolling a machine as easy as possible | Today: one line on the machine, or `push` from the Mac, plus one login (open a link, paste a code). See "needs owner" for removing the login |
 
 ## Needs owner
@@ -50,12 +51,12 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 
 | Item | Notes |
 |---|---|
-| Recover when the UTM app is closed or hung | Done, merged there. When UTM does not answer a start, the tool restarts UTM once and retries, only when every VM is stopped. Proven by unit tests; the real restart has not been run against a hung UTM |
+| Recover when the UTM app is closed or hung | A fallback is merged there: when UTM does not answer a start, the tool restarts UTM once and retries, only when every VM is stopped. The cause was then measured (2 Oct 2026): a request that reaches UTM while it is launching makes every later VM start hang (3 of 3), and waiting 0.3 s or more before the first request avoids it (16 of 16). Opening UTM takes about 1 s and checking whether it runs 0.014 s. A helper is building the real fix: check first, open UTM if it is closed, wait without talking to it, then ask |
 | Formalise SSH into a VM | Done, merged there: `irgo-winvm vm-ssh-create -vm <name>` turns on OpenSSH Server, opens the firewall to the local subnet, adds a public key and prints the `ssh` line; `vm-ssh-delete` undoes it. Run live on a fresh clone: 9 min 46 s the first time (Windows installing the capability), 16 s on a repeat, key login worked, the undo closed the port |
 | Seal the golden image with OpenSSH Server installed | The ten minutes above is Windows installing the capability. Sealed into the golden image, every clone would have SSH in seconds |
 | Release the UTM repo | Done: `v0.6.0`, with the two changes above |
 | A command that runs a shell command in the guest and returns the output | `utmctl exec` returns neither output nor exit code. `app-create` does, but only for an `.exe` |
-| Linux VMs | The plan is merged there (`.plans/2026-10-02_1950_linux-vms.md`): an Ubuntu 24.04 ARM64 cloud image with cloud-init, behind one guest description so nothing is implemented twice. Phase 1 (a Linux VM the rig can SSH into) is being built by a helper, starting with measurements on a real VM. When it lands, the rig's Linux test machine moves from OrbStack to UTM |
+| Linux VMs | The plan is merged there (`.plans/2026-10-02_1950_linux-vms.md`): an Ubuntu 24.04 ARM64 cloud image with cloud-init, behind one guest description so nothing is implemented twice. No R2 cache is needed for Linux: Ubuntu publishes the 591 MB image itself. Phase 1 is a draft pull request there: `vm-create -os linux` took 1 min 42 s with the download, `vm-ssh-create` 2.7 s, and the rig's `push` rigged the VM with a second run changing nothing. Two late changes are unit-tested only and need a live run before it merges. Then the rig's Linux test machine moves from OrbStack to UTM |
 | The UTM tool's name | With Linux in it, "irgo-windows-vm" no longer fits. Needs the owner: keep it, rename the binary, rename the repo, or decide it together with how the two repos fit |
 | Run the rig before sealing the golden image | Plan step 6: every clone then starts as a rigged machine, and only needs its login |
 | Releases | The owner wants releases pushed for both repos, when the lead judges them ready |
