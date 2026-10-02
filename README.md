@@ -45,7 +45,7 @@ Then it logs in and starts the always-on session:
 
 On Windows, pitchfork cannot start at boot, so the session starts when the user signs in (a small file in the Startup folder) and restarts itself. A Windows machine that reboots with nobody signed in stays offline until someone signs in.
 
-`mise run doctor` (in `~/.claude-rig`) shows what is set up and what is missing without changing anything. The design is in [the plan](.plans/2026-10-02-01-claude-rig.md), and what is done and what is next is in [the backlog](.plans/BACKLOG.md).
+`mise run doctor` (in `~/.claude-rig`) reports on the machine and shows what a run would change, without changing anything. `mise run doctor -- --json` prints the report as JSON. The design is in [the plan](.plans/2026-10-02-01-claude-rig.md), and what is done and what is next is in [the backlog](.plans/BACKLOG.md).
 
 ## Update the config from the Mac
 

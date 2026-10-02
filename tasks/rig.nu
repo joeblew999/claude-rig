@@ -17,12 +17,6 @@ def mise-config-dir []: nothing -> path {
   )
 }
 
-# The tools that mise still has to install, looking only at the machine-wide list.
-def missing-tools []: nothing -> string {
-  cd $nu.home-dir
-  ^mise ls --current --missing | complete | get stdout | str trim
-}
-
 def install-tools [] {
   cd $nu.home-dir
   ^mise install --yes

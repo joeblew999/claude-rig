@@ -18,6 +18,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | Always-on session on Windows, started at sign-in | CI on Windows x64 and ARM64 checks the sign-in entry and the restart loop. The runner cannot log in, so the server connecting is not tested: that needs a real Windows machine |
 | `push`: rig a remote machine over SSH from the Mac | Ubuntu containers over SSH, and the Windows 11 ARM64 VM in UTM set up like the office PC (OpenSSH Server, key in `administrators_authorized_keys`, cmd as the shell): dry run, real run from nothing, second run with no changes. Not tested against macOS, or a machine whose sudo asks for a password |
 | One-line bootstrap on a real Linux machine with systemd | A fresh Ubuntu 24.04 VM in OrbStack. It stops at the login step, as designed |
+| `doctor`: a short report on the machine, and `--json` for a control plane | This Mac, and CI on all five runners |
 | AGENTS.md and this backlog | |
 
 ## Next
@@ -29,7 +30,6 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | Finish the two test VMs | The Linux VM (OrbStack) and the Windows VM (UTM) are rigged and waiting at the login prompt. With the owner's two codes: test the session on each, then reboot each |
 | Reboot test on each OS | Confirms the session comes back by itself |
 | Make enrolling a machine as easy as possible | Today: one line on the machine, or `push` from the Mac, plus one login (open a link, paste a code). See "needs owner" for removing the login |
-| `doctor --json` | `mise run doctor` is the dry run today. JSON output is the shape a control plane will take in |
 
 ## Needs owner
 
@@ -56,7 +56,7 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 
 | Item | Notes |
 |---|---|
-| Control plane: see every machine in one place | The owner's Cloudflare Worker in irgo-windows-vm is the place. Its ledger could take a check-in today only as a hack, and a plan there (`.plans/2026-10-01_1520_device-schema.md`) already proposes a devices API that is waiting on four owner decisions. So: `doctor --json` first, then post it to that API once it exists. The Claude app already shows which machines are connected |
+| Control plane: see every machine in one place | The owner's Cloudflare Worker in irgo-windows-vm is the place. Its ledger could take a check-in today only as a hack, and a plan there (`.plans/2026-10-01_1520_device-schema.md`) already proposes a devices API that is waiting on four owner decisions. `doctor --json` is the check-in a machine would send; post it to that API once it exists. Before then, a `fleet` task could run `doctor --json` on every machine over SSH and show one table. The Claude app already shows which machines are connected |
 | Sort out the overlap with the UTM repo | The owner wants no loose ends: decide what lives where, shared naming, and whether the repos merge. Starts after this ships. First seam: irgo-winvm runs the bootstrap before it takes the golden image (plan step 6) |
 | Look at nur as the task runner | The owner pointed at https://github.com/nur-taskrunner/nur, a task runner where the tasks are nushell. Today mise runs the tasks and needs to be there anyway for the tools, so the question is whether nur adds enough |
 | Windows session with nobody signed in | The session starts at sign-in. A PC that reboots unattended needs auto sign-in or a service, which needs administrator rights |
