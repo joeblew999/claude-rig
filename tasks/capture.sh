@@ -23,22 +23,34 @@ command -v rsync >/dev/null || die "rsync is missing"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# settings.json: drop env entries whose names look like secrets
+# settings.json: drop env entries whose names look like secrets, and the keys
+# that only make sense on this Mac (local folders, local socket paths)
 if [ -f "$SRC/settings.json" ]; then
   jq 'if has("env") then
         .env |= with_entries(select(.key | test("TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL"; "i") | not))
-      else . end' "$SRC/settings.json" > "$TMP/settings.json" \
+      else . end
+      | del(.permissions.additionalDirectories, .sandbox.network.allowUnixSockets)' \
+    "$SRC/settings.json" > "$TMP/settings.json" \
     || die "settings.json is not valid JSON"
 fi
 
 [ -f "$SRC/CLAUDE.md" ] && cp "$SRC/CLAUDE.md" "$TMP/CLAUDE.md"
 
+# skills/synced is filled in by the Claude account on each machine, so it is
+# not ours to copy.
 for d in "${DIRS[@]}"; do
   if [ -d "$SRC/$d" ]; then
     mkdir -p "$TMP/$d"
-    rsync -a --exclude '.DS_Store' "$SRC/$d/" "$TMP/$d/"
+    rsync -a --exclude '.DS_Store' --exclude '/synced' "$SRC/$d/" "$TMP/$d/"
   fi
 done
+
+# Machine check: stop if a path under this Mac's home folder got through
+if grep -rFIl "$HOME" "$TMP" >/dev/null 2>&1; then
+  echo "capture: these files mention $HOME (claude/ was not changed):" >&2
+  grep -rFIl "$HOME" "$TMP" | sed "s|^$TMP|  $SRC|" >&2
+  exit 1
+fi
 
 # Secret check: stop if anything token-shaped got through
 PATTERNS='sk-ant-[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|xox[baprs]-[A-Za-z0-9-]{10,}'
