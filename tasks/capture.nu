@@ -44,7 +44,8 @@ def clean-settings []: record -> record {
 
 # The files under a folder whose text matches a pattern. Binary files are skipped.
 def files-matching [root: path, pattern: string]: nothing -> list<string> {
-  glob ($root | path join "**" "*") --no-dir | where {|file|
+  cd $root
+  glob "**/*" --no-dir | where {|file|
     let text = try { open --raw $file | decode utf-8 } catch { "" }
     $text =~ $pattern
   }
@@ -75,7 +76,7 @@ def main [] {
       cp --recursive $entry ($tmp | path join $dir ($entry | path basename))
     }
   }
-  glob ($tmp | path join "**" ".DS_Store") | each {|file| rm $file }
+  do { cd $tmp; glob "**/.DS_Store" } | each {|file| rm $file }
 
   let home = $nu.home-dir | str replace --all '\' '\\' | str replace --all '.' '\.'
   for check in [

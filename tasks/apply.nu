@@ -64,7 +64,14 @@ def main [
 
   # The manifest is written at the end of the first run, so once it exists
   # whatever is in ~/.claude has already been through the rig.
-  let backups = glob $"($dest | path expand --no-symlink).rig-backup-*"
+  let parent = $dest | path dirname
+  let backups = if ($parent | path exists) {
+    ls --all $parent
+    | get name
+    | where {|path| ($path | path basename) starts-with $"($dest | path basename).rig-backup-" }
+  } else {
+    []
+  }
   if ($backups | is-not-empty) {
     ok "backup (taken on the first run)"
   } else if ($manifest | path exists) {
