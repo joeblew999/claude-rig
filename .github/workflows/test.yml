@@ -93,3 +93,22 @@ jobs:
           if (Select-String -Path second-run.log -Pattern '^ +(change|would) ') {
             throw 'The second run made changes.'
           }
+
+      # The runner cannot log in to Claude, so the server itself cannot connect.
+      # This checks the parts around it: the sign-in entry and the keep-alive loop.
+      - name: Session starts at sign-in and stays up
+        env:
+          RIG_ASSUME_LOGGED_IN: "1"
+        run: |
+          .\bootstrap.ps1
+          $startup = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\claude-rig.cmd"
+          if (-not (Test-Path $startup)) { throw 'no sign-in entry' }
+          Get-Content $startup
+          Start-Sleep -Seconds 25
+          $session = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'session\.nu' }
+          if (-not $session) { throw 'the session is not running' }
+          Get-Content "$HOME\.claude-rig-session.log" -ErrorAction SilentlyContinue | Select-Object -First 10
+          .\bootstrap.ps1 | Tee-Object session-second-run.log
+          if (Select-String -Path session-second-run.log -Pattern '^ +(change|would) ') {
+            throw 'The second run with the session made changes.'
+          }
