@@ -15,7 +15,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | `--dry-run` that changes nothing, even on a bare machine | CI on all five runners |
 | Login step: `claude auth login` with a claude.ai account | This Mac (already logged in). The login prompt itself has not been run on a new machine |
 | Always-on session under pitchfork, back after a reboot | This Mac: starts, shows in the Claude app, the rig restarts it when stopped. Not rebooted. Linux is the same code, not yet run on a real Linux machine with a login |
-| Always-on session on Windows, started at sign-in | CI on Windows x64 and ARM64, and the Windows 11 VM in UTM over SSH: the sign-in entry, the restart loop, the session surviving the SSH connection closing, a second run changing nothing. The server connecting is not tested until that VM is logged in |
+| Always-on session on Windows, started at sign-in | CI on Windows x64 and ARM64, and the Windows 11 VM in UTM over SSH: the sign-in entry, the restart loop, the session surviving the SSH connection closing, a second run changing nothing, and a reboot (the VM signed in by itself and the session loop came back). The server connecting is not tested until that VM is logged in |
 | `push`: rig a remote machine over SSH from the Mac | Ubuntu containers over SSH, and the Windows 11 ARM64 VM in UTM set up like the office PC (OpenSSH Server, key in `administrators_authorized_keys`, cmd as the shell): dry run, real run from nothing, second run with no changes. CI also pushes from a Windows runner to its own SSH server (x64 and ARM64), with cmd and with PowerShell as the SSH shell. Not tested: a macOS remote, a machine whose sudo asks for a password, a Windows account that is not an administrator, a user name with a space in it |
 | One-line bootstrap on a real Linux machine with systemd | A fresh Ubuntu 24.04 VM in OrbStack. It stops at the login step, as designed |
 | `doctor`: a short report on the machine, and `--json` for a control plane | This Mac, and CI on all five runners |
@@ -31,7 +31,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | Rig the office Windows PC | It has an old Claude install and winget packages to look at first. Blocked on turning on OpenSSH Server there and its user name and address |
 | First real Windows login and session | Everything on Windows is tested only on CI runners, which cannot log in. The office PC is the first real test: the login prompt, the work folder approval, and the session showing up in the Claude app |
 | Finish the two test VMs | The Linux VM (OrbStack) and the Windows VM (UTM) are rigged and waiting at the login prompt. With the owner's two codes: test the session on each, then reboot each |
-| Reboot test on each OS | Confirms the session comes back by itself |
+| Reboot test on macOS and Linux | Windows is done (see above). The Mac has not been rebooted, and the Linux VM has no session until it is logged in |
 | Make enrolling a machine as easy as possible | Today: one line on the machine, or `push` from the Mac, plus one login (open a link, paste a code). See "needs owner" for removing the login |
 
 ## Needs owner
@@ -52,9 +52,10 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 | Recover when the UTM app is closed or hung | Done, merged there. When UTM does not answer a start, the tool restarts UTM once and retries, only when every VM is stopped. Proven by unit tests; the real restart has not been run against a hung UTM |
 | Formalise SSH into a VM | Done, merged there: `irgo-winvm vm-ssh-create -vm <name>` turns on OpenSSH Server, opens the firewall to the local subnet, adds a public key and prints the `ssh` line; `vm-ssh-delete` undoes it. Run live on a fresh clone: 9 min 46 s the first time (Windows installing the capability), 16 s on a repeat, key login worked, the undo closed the port |
 | Seal the golden image with OpenSSH Server installed | The ten minutes above is Windows installing the capability. Sealed into the golden image, every clone would have SSH in seconds |
-| Release the UTM repo | Two changes are merged since its last release. Its release process has not been read yet |
+| Release the UTM repo | Done: `v0.6.0`, with the two changes above |
 | A command that runs a shell command in the guest and returns the output | `utmctl exec` returns neither output nor exit code. `app-create` does, but only for an `.exe` |
-| Linux VMs | The owner wants Linux in UTM too, done properly. Today the tool is Windows only; the rig's Linux test machine is an OrbStack VM |
+| Linux VMs | The plan is merged there (`.plans/2026-10-02_1950_linux-vms.md`): an Ubuntu 24.04 ARM64 cloud image with cloud-init, behind one guest description so nothing is implemented twice. Phase 1 (a Linux VM the rig can SSH into) is being built by a helper, starting with measurements on a real VM. When it lands, the rig's Linux test machine moves from OrbStack to UTM |
+| The UTM tool's name | With Linux in it, "irgo-windows-vm" no longer fits. Needs the owner: keep it, rename the binary, rename the repo, or decide it together with how the two repos fit |
 | Run the rig before sealing the golden image | Plan step 6: every clone then starts as a rigged machine, and only needs its login |
 | Releases | The owner wants releases pushed for both repos, when the lead judges them ready |
 
