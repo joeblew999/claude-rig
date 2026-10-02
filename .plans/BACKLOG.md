@@ -19,6 +19,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | `push`: rig a remote machine over SSH from the Mac | Ubuntu containers over SSH, and the Windows 11 ARM64 VM in UTM set up like the office PC (OpenSSH Server, key in `administrators_authorized_keys`, cmd as the shell): dry run, real run from nothing, second run with no changes. Not tested against macOS, or a machine whose sudo asks for a password |
 | One-line bootstrap on a real Linux machine with systemd | A fresh Ubuntu 24.04 VM in OrbStack. It stops at the login step, as designed |
 | `doctor`: a short report on the machine, and `--json` for a control plane | This Mac, and CI on all five runners |
+| `unrig`: take a machine out of the fleet | This Mac: unrig, unrig again (nothing to do), rig again (session back). The Windows half has not been run |
 | AGENTS.md and this backlog | |
 
 ## Next
@@ -37,7 +38,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 |---|---|
 | Log every machine in from one captured secret | Remote Control needs a full claude.ai login. A `claude setup-token` token cannot do it (Claude's docs say so). Copying the Mac's own login to other machines is not documented, and those logins refresh themselves, so one copy may log out the others, including the Mac. Recommended: each machine logs in once, about 30 seconds. If you want the copy tried, it should be on a spare machine, accepting that the Mac may need to log in again |
 | What a machine may do without asking | The Mac's settings (`bypassPermissions`) are applied to every machine. That is right for a VM or a dedicated worker. Say if some machines should be stricter |
-| Should this Mac stay an always-on worker | It is one now, as the test. To turn it off: `pitchfork stop claude-rig`, then remove `[daemons.claude-rig]` from `~/.config/pitchfork/config.toml` |
+| Should this Mac stay an always-on worker | It is one now, as the test. To turn it off: `mise run unrig` in the repo |
 
 ## The UTM repo (irgo-windows-vm)
 
@@ -62,6 +63,5 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 | Windows session with nobody signed in | The session starts at sign-in. A PC that reboots unattended needs auto sign-in or a service, which needs administrator rights |
 | Keep the Windows session log small | `~/.claude-rig-session.log` is started fresh on each start but grows while the server runs |
 | Stricter nushell checks | CI runs `nu-check`. It missed one error that only showed at run time, so add a linter or tests that run each task |
-| Remove a machine from the fleet | An `unrig` task: stop the session, take out the service, leave the tools |
 | A dedicated user for the session | The plan asks for it where the OS allows |
 | Product basics | Licence, versioned releases, a changelog |
