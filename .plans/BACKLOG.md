@@ -21,6 +21,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | `doctor`: a short report on the machine, and `--json` for a control plane | This Mac, and CI on all five runners |
 | `unrig`: take a machine out of the fleet | This Mac and the Windows 11 VM: unrig, unrig again (nothing to do), rig again (session back) |
 | `fleet`: every rigged machine in one table | This Mac, the Windows 11 VM and the Ubuntu VM, side by side. `push` adds a machine to the list; the list stays on the Mac, outside the repo |
+| First release: `v0.1.0`, a pre-release | Tagged on the commit where every CI job on main passed, including the ARM64 push test |
 | AGENTS.md and this backlog | |
 
 ## Next
@@ -39,6 +40,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 |---|---|
 | Log every machine in from one captured secret | Remote Control needs a full claude.ai login. A `claude setup-token` token cannot do it (Claude's docs say so). Copying the Mac's own login to other machines is not documented, and those logins refresh themselves, so one copy may log out the others, including the Mac. Recommended: each machine logs in once, about 30 seconds. If you want the copy tried, it should be on a spare machine, accepting that the Mac may need to log in again |
 | What a machine may do without asking | The Mac's settings (`bypassPermissions`) are applied to every machine. That is right for a VM or a dedicated worker. Say if some machines should be stricter |
+| A licence for claude-rig | There is no licence file, so nobody else may legally use it. The UTM repo has one: say "same as that" or name another |
 | Should this Mac stay an always-on worker | It is one now, as the test. To turn it off: `mise run unrig` in the repo |
 
 ## The UTM repo (irgo-windows-vm)
@@ -47,8 +49,10 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 
 | Item | Notes |
 |---|---|
-| Recover when the UTM app is closed or hung | `vm-create` cloned fine, then failed to boot with `AppleEvent timed out (-1712)` because UTM had been closed down and was not answering. Quitting and reopening UTM fixed it. The tool should notice and restart UTM itself, since no VM is running at that point |
-| Formalise SSH into a VM | The rig's tests needed SSH in the guest. It was turned on by hand: a small program run through `app-create` that installs OpenSSH Server, opens the firewall and adds a key. That should be a command (or part of the golden image) so any agent can do it |
+| Recover when the UTM app is closed or hung | Done, merged there. When UTM does not answer a start, the tool restarts UTM once and retries, only when every VM is stopped. Proven by unit tests; the real restart has not been run against a hung UTM |
+| Formalise SSH into a VM | Done, merged there: `irgo-winvm vm-ssh-create -vm <name>` turns on OpenSSH Server, opens the firewall to the local subnet, adds a public key and prints the `ssh` line; `vm-ssh-delete` undoes it. Run live on a fresh clone: 9 min 46 s the first time (Windows installing the capability), 16 s on a repeat, key login worked, the undo closed the port |
+| Seal the golden image with OpenSSH Server installed | The ten minutes above is Windows installing the capability. Sealed into the golden image, every clone would have SSH in seconds |
+| Release the UTM repo | Two changes are merged since its last release. Its release process has not been read yet |
 | A command that runs a shell command in the guest and returns the output | `utmctl exec` returns neither output nor exit code. `app-create` does, but only for an `.exe` |
 | Linux VMs | The owner wants Linux in UTM too, done properly. Today the tool is Windows only; the rig's Linux test machine is an OrbStack VM |
 | Run the rig before sealing the golden image | Plan step 6: every clone then starts as a rigged machine, and only needs its login |
@@ -65,4 +69,4 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 | Keep the Windows session log small | `~/.claude-rig-session.log` is started fresh on each start but grows while the server runs |
 | Stricter nushell checks | CI runs `nu-check`. It missed one error that only showed at run time, so add a linter or tests that run each task |
 | A dedicated user for the session | The plan asks for it where the OS allows |
-| Product basics | Licence, versioned releases, a changelog |
+| Product basics | A changelog. Releases have started (`v0.1.0`) |
