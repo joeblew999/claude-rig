@@ -1,0 +1,6 @@
+[tools]
+jq = "latest"
+
+[tasks.capture]
+description = "Copy this Mac's global Claude config (~/.claude) into claude/"
+run = "bash tasks/capture.sh"
