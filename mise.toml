@@ -18,6 +18,10 @@ run = "nu tasks/apply.nu"
 description = "Copy this Mac's global Claude config (~/.claude) into claude/"
 run = "nu tasks/capture.nu"
 
+[tasks.push]
+description = "Rig a remote machine over SSH: mise run push user@host. Pass --dry-run to only look."
+run = "nu tasks/push.nu"
+
 [tasks.lint]
 description = "Check the scripts"
 run = [
