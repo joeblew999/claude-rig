@@ -80,7 +80,7 @@ def main [
     let to = $"($dest).rig-backup-(date now | format date '%Y%m%d-%H%M%S')"
     change $"back up the current config to ($to)" { backup $dest $to }
   } else {
-    skip $"backup \(no ($dest) yet)"
+    skipped $"backup \(no ($dest) yet)"
   }
 
   if not (dry-run) { mkdir $dest }

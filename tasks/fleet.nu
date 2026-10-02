@@ -9,6 +9,8 @@
 #   nu tasks/fleet.nu --json          the same, as JSON
 #   nu tasks/fleet.nu add user@host   add a machine that was rigged by hand
 #   nu tasks/fleet.nu forget user@host
+#   nu tasks/fleet.nu run <machine> "<work>"   give one machine a piece of work
+#   nu tasks/fleet.nu run --all "<work>"       give every machine the same work
 
 use lib.nu *
 use remote.nu *
@@ -77,6 +79,87 @@ def "main forget" [target: string] {
   } else {
     print $"fleet: ($target) is not on the list."
   }
+}
+
+# The command that runs one piece of work with Claude on a machine, in its
+# work folder, and prints Claude's answer. The work itself is never put on a
+# command line, where quoting would mangle it: on macOS and Linux it goes in
+# on stdin, and on Windows it rides inside the script as base64.
+def work-on [os: string, work: string]: nothing -> record {
+  if $os == "Windows" {
+    let encoded = $work | encode base64
+    {
+      command: "powershell -NoProfile -ExecutionPolicy Bypass -Command -"
+      input: ([
+        $"$work = [Text.Encoding]::UTF8.GetString\([Convert]::FromBase64String\('($encoded)'))"
+        '$env:Path = "$HOME\.local\bin;$env:LOCALAPPDATA\mise\shims;$env:Path"'
+        'Set-Location "$HOME\work"'
+        '$work | claude -p'
+      ] | str join "\n")
+    }
+  } else {
+    {
+      command: 'cd "$HOME/work" && PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH" claude -p'
+      input: $work
+    }
+  }
+}
+
+# Give one machine the work and wait for the answer.
+def run-on [machine: record, work: string]: nothing -> record {
+  let started = date now
+  let result = if $machine.target == "(this machine)" {
+    cd (work-dir)
+    $work | ^claude -p | complete
+  } else {
+    let options = ssh-options ($machine.port? | default null) ($machine.identity? | default null) ($machine.known_hosts? | default null)
+    let how = work-on $machine.os $work
+    $how.input | ^ssh -o BatchMode=yes ...$options $machine.target $how.command | complete
+  }
+  {
+    machine: $machine.target
+    ok: ($result.exit_code == 0)
+    seconds: ((date now) - $started | into int | $in / 1_000_000_000 | math round --precision 1)
+    answer: (if $result.exit_code == 0 { $result.stdout | str trim } else { $"($result.stdout | str trim)\n($result.stderr | str trim)" | str trim })
+  }
+}
+
+# Give a machine a piece of work: Claude runs it there, in the machine's work
+# folder, with that machine's settings, and the answer comes back here. With
+# --all, every machine gets the same work at the same time.
+#
+# This is how a lead Claude spreads work over the fleet: one call per piece
+# of work, each to a different machine.
+def "main run" [
+  ...words: string  # The machine (a name from the fleet table, or user@host), then the work. With --all, only the work
+  --all             # Every machine, this one included
+  --json            # Print the results as JSON
+] {
+  let here = {target: "(this machine)", os: "here"}
+  let machines = [$here] ++ (known-machines)
+  let chosen = if $all {
+    $machines
+  } else {
+    if ($words | length) < 2 { fail fleet "say which machine, then the work. Or use --all." }
+    let wanted = $words.0
+    let found = $machines | where {|machine| $machine.target == $wanted or ($wanted == (machine-name) and $machine.target == "(this machine)") }
+    if ($found | is-empty) { fail fleet $"no machine called ($wanted). `mise run fleet` lists them by their `where`." }
+    $found
+  }
+  let work = (if $all { $words } else { $words | skip 1 }) | str join " "
+  if ($work | str trim) == "" { fail fleet "there is no work to give." }
+
+  let results = $chosen | par-each {|machine| run-on $machine $work }
+  if $json {
+    print ($results | to json --indent 2)
+  } else {
+    for result in $results {
+      let state = if $result.ok { "done" } else { "FAILED" }
+      print $"--- ($result.machine): ($state) in ($result.seconds)s"
+      print $result.answer
+    }
+  }
+  if ($results | any {|result| not $result.ok }) { exit 1 }
 }
 
 def main [

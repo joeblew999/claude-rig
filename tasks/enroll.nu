@@ -19,7 +19,7 @@ export def logged-in []: nothing -> bool {
 export def --env login-step []: nothing -> bool {
   # For CI only: exercise the session step on a machine that cannot log in.
   if ($env.RIG_ASSUME_LOGGED_IN? | default "0") == "1" {
-    skip "login (RIG_ASSUME_LOGGED_IN is set, for tests)"
+    skipped "login (RIG_ASSUME_LOGGED_IN is set, for tests)"
     return true
   }
   if (logged-in) {
@@ -31,7 +31,7 @@ export def --env login-step []: nothing -> bool {
     return false
   }
   if not (is-terminal --stdin) {
-    skip "login: there is no terminal to ask on. Run `claude auth login`, then run the rig again"
+    skipped "login: there is no terminal to ask on. Run `claude auth login`, then run the rig again"
     return false
   }
   change "log in to Claude: open the link it prints, approve it, and paste the code back" {
@@ -51,7 +51,7 @@ def --env trust-work-dir [] {
   # Claude names folders with forward slashes on every OS.
   let dir = work-dir | str replace --all '\' '/'
   if not ($state | path exists) {
-    skip "work folder approval (Claude has not run on this machine yet)"
+    skipped "work folder approval (Claude has not run on this machine yet)"
     return
   }
   let data = open --raw $state | from json

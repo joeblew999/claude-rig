@@ -9,7 +9,7 @@ export def ok [what: string] {
 }
 
 # Nothing to do here, and why.
-export def skip [what: string] {
+export def skipped [what: string] {
   print $"  skip    ($what)"
 }
 
