@@ -16,25 +16,13 @@
 # (--known-hosts NUL when this machine is Windows).
 
 use lib.nu *
+use remote.nu *
 
 const RAW = "https://raw.githubusercontent.com/joeblew999/claude-rig"
 
 # Where a file of the rig is published for a branch.
 def raw-url [ref: string, file: string]: nothing -> string {
   $"($RAW)/($ref)/($file)"
-}
-
-# The ssh options every connection uses.
-def ssh-options [port: any, identity: any, known_hosts: any]: nothing -> list<string> {
-  [-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10]
-  | append (if $port != null { [-p ($port | into string)] } else { [] })
-  | append (if $identity != null { [-i $identity -o IdentitiesOnly=yes] } else { [] })
-  | append (if $known_hosts != null { [-o $"UserKnownHostsFile=($known_hosts)"] } else { [] })
-}
-
-# Run a short command on the remote and capture it. Never asks for anything.
-def probe [options: list<string>, target: string, command: string]: nothing -> record {
-  ^ssh -n -o BatchMode=yes ...$options $target $command | complete
 }
 
 # The remote OS: macOS, Linux or Windows. Stops if it is none of those.
@@ -162,6 +150,7 @@ def main [
   } else if $dry_run {
     print $"push: ($target) \(($os)): dry run finished. Nothing was changed."
   } else {
-    print $"push: ($target) \(($os)): rigged."
+    remember-machine {target: $target, os: $os, port: $port, identity: $identity, known_hosts: $known_hosts}
+    print $"push: ($target) \(($os)): rigged. `mise run fleet` shows it with the others."
   }
 }
