@@ -22,6 +22,8 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | `unrig`: take a machine out of the fleet | This Mac and the Windows 11 VM: unrig, unrig again (nothing to do), rig again (session back) |
 | `fleet`: every rigged machine in one table | This Mac, the Windows 11 VM and the Ubuntu VM, side by side. `push` adds a machine to the list; the list stays on the Mac, outside the repo |
 | First release: `v0.1.0`, a pre-release | Tagged on the commit where every CI job on main passed, including the ARM64 push test |
+| Tests for the config merge (`mise run test`) | This Mac and CI on all five runners: a fresh machine, a machine with its own config, a changed skill, a dropped skill, broken settings. Checked once that breaking the merge fails the tests |
+| Licence: MIT, the same as the UTM repo | The lead chose it after asking twice; the owner can change it |
 | AGENTS.md and this backlog | |
 
 ## Next
@@ -40,7 +42,6 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 |---|---|
 | Log every machine in from one captured secret | Remote Control needs a full claude.ai login. A `claude setup-token` token cannot do it (Claude's docs say so). Copying the Mac's own login to other machines is not documented, and those logins refresh themselves, so one copy may log out the others, including the Mac. Recommended: each machine logs in once, about 30 seconds. If you want the copy tried, it should be on a spare machine, accepting that the Mac may need to log in again |
 | What a machine may do without asking | The Mac's settings (`bypassPermissions`) are applied to every machine. That is right for a VM or a dedicated worker. Say if some machines should be stricter |
-| A licence for claude-rig | There is no licence file, so nobody else may legally use it. The UTM repo has one: say "same as that" or name another |
 | Should this Mac stay an always-on worker | It is one now, as the test. To turn it off: `mise run unrig` in the repo |
 
 ## The UTM repo (irgo-windows-vm)
@@ -65,9 +66,9 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 |---|---|
 | Control plane: see every machine in one place | The owner's Cloudflare Worker in irgo-windows-vm is the place. Its ledger could take a check-in today only as a hack, and a plan there (`.plans/2026-10-01_1520_device-schema.md`) already proposes a devices API that is waiting on four owner decisions. `doctor --json` is the check-in a machine would send; post it to that API once it exists. Until then, `mise run fleet` on the Mac is the control plane: it asks each machine over SSH. It only sees machines the Mac can reach. The Claude app already shows which machines are connected |
 | Sort out the overlap with the UTM repo | The owner wants no loose ends: decide what lives where, shared naming, and whether the repos merge. Starts after this ships. First seam: irgo-winvm runs the bootstrap before it takes the golden image (plan step 6) |
-| Look at nur as the task runner | The owner pointed at https://github.com/nur-taskrunner/nur, a task runner where the tasks are nushell. Today mise runs the tasks and needs to be there anyway for the tools, so the question is whether nur adds enough |
+| nur as the task runner | Looked at on 2 Oct 2026: active (released 28 Sep 2026, built on the same nushell 0.116 the rig pins), tasks are nushell functions in one `nurfile`. Verdict: not now. mise has to be on every machine anyway to install the tools, and it already runs the nushell tasks, so nur would be a second runner to install and keep in step on three OSes. Worth another look if the tasks grow shared arguments and sub-commands that mise handles badly |
 | Windows session with nobody signed in | The session starts at sign-in. A PC that reboots unattended needs auto sign-in or a service, which needs administrator rights |
 | Keep the Windows session log small | `~/.claude-rig-session.log` is started fresh on each start but grows while the server runs |
-| Stricter nushell checks | CI runs `nu-check`. It missed one error that only showed at run time, so add a linter or tests that run each task |
+| Tests for the other tasks | `apply` has tests. `capture`, `doctor`, `fleet` and the session steps are covered only by the CI runs and by hand |
 | A dedicated user for the session | The plan asks for it where the OS allows |
 | Product basics | A changelog. Releases have started (`v0.1.0`) |

@@ -47,6 +47,11 @@ jobs:
           jq -e '.remoteControlAtStartup == true' "$HOME/.claude/settings.json"
           test -f "$HOME/.claude/skills/mise-tasks/SKILL.md"
 
+      - name: Tests
+        run: |
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+          nu tests/apply.nu
+
       - name: Doctor reports this machine
         run: |
           export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
@@ -92,6 +97,12 @@ jobs:
           $settings = Get-Content "$HOME\.claude\settings.json" -Raw | ConvertFrom-Json
           if (-not $settings.remoteControlAtStartup) { throw 'remote control is not on' }
           if (-not (Test-Path "$HOME\.claude\skills\mise-tasks\SKILL.md")) { throw 'skills are missing' }
+
+      - name: Tests
+        run: |
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
+          nu tests\apply.nu
+          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
 
       - name: Doctor reports this machine
         run: |

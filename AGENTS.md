@@ -42,8 +42,11 @@ The lead decides when to bring in helpers. Use them when items do not touch the 
 
 ```sh
 mise run lint            # shellcheck and nushell's checker
+mise run test            # the config merge, against throwaway Claude folders
 mise run doctor          # what is set up here and what is missing; changes nothing
 mise run rig             # the real run on this machine
 ```
 
 A change to the bootstrap or a task is tested with a dry run, a real run and a second real run. The second run must print no `change` lines.
+
+A test in `tests/` runs the real task against a temp folder and checks what it left behind. When adding one, break the code on purpose once and see the test fail: a test that cannot fail proves nothing.

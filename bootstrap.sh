@@ -104,7 +104,14 @@ elif [ "$DRY_RUN" = 1 ]; then
   would "install mise"
 else
   say "installing mise"
-  curl -fsSL https://mise.run | sh
+  # The download can be cut off by a network blip, so try a few times.
+  attempt=1
+  until curl -fsSL --retry 3 https://mise.run | sh; do
+    [ "$attempt" -lt 3 ] || die "mise did not install after 3 tries. Check the network and run this again."
+    attempt=$((attempt + 1))
+    say "the mise install failed, trying again ($attempt of 3)"
+    sleep 5
+  done
   have mise || die "mise did not install into $HOME/.local/bin"
 fi
 
@@ -140,7 +147,11 @@ if [ -n "$here" ] && [ -f "$here/tasks/rig.nu" ]; then
   say "ok       rig checkout at $RIG_DIR"
 elif [ "$DRY_RUN" = 1 ]; then
   # Look at the rig without leaving a clone behind.
-  would "keep a clone of the rig in $RIG_DIR"
+  if [ -d "$RIG_DIR/.git" ]; then
+    say "ok       rig clone at $RIG_DIR (a real run brings it up to date)"
+  else
+    would "keep a clone of the rig in $RIG_DIR"
+  fi
   if ! have git; then
     would "then install nushell, the tools, Claude Code and the Claude config"
     say "dry run finished. Nothing was changed."
