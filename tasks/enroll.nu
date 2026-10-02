@@ -188,7 +188,7 @@ def --env session-windows [] {
   } else {
     change $"start the session as \"(machine-name)\"" {
       # Stop an older session first, so two never run side by side.
-      powershell 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "session\.nu" } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }'
+      powershell 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "session\.nu" } | ForEach-Object { taskkill /PID $_.ProcessId /T /F 2>&1 | Out-Null }'
       start-on-desktop $file
     }
   }
@@ -227,7 +227,7 @@ export def --env remove-session [] {
     let file = startup-file
     if (windows-session-running) {
       change "stop the session" {
-        powershell 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "session\.nu" } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }'
+        powershell 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "session\.nu" } | ForEach-Object { taskkill /PID $_.ProcessId /T /F 2>&1 | Out-Null }'
       }
     } else {
       ok "session is not running"
