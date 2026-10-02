@@ -136,7 +136,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, windows-11-arm]
+        # The ARM64 runner takes about 20 minutes here, so it runs only on main.
+        os: ${{ github.event_name == 'push' && fromJSON('["windows-latest", "windows-11-arm"]') || fromJSON('["windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:

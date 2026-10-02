@@ -32,7 +32,7 @@ To only look:
 mise run push user@host
 ```
 
-It works out which OS is on the other end and runs the right bootstrap there. The machine must accept your SSH key. Add `--dry-run` to only look. Tested against Linux; not yet against a Windows or macOS machine.
+It works out which OS is on the other end and runs the right bootstrap there. The machine must accept your SSH key. Add `--dry-run` to only look. Tested against Linux and Windows machines; not yet against another Mac.
 
 ## What a run does
 

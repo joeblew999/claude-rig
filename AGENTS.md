@@ -13,7 +13,7 @@ Read [the plan](.plans/2026-10-02-01-claude-rig.md) for the design and [the back
 ## How work lands
 
 1. One backlog item, one branch, one pull request.
-2. CI must be green before a merge. CI runs the bootstrap on fresh macOS, Linux (x64 and ARM64) and Windows (x64 and ARM64) machines, and fails if a second run changes anything.
+2. CI must be green before a merge. CI runs the bootstrap on fresh macOS, Linux (x64 and ARM64) and Windows (x64 and ARM64) machines, and fails if a second run changes anything. It also pushes a rig over SSH to a Windows runner. That job's ARM64 leg takes about 20 minutes, so it runs only on main.
 3. The lead merges its own pull requests. It does not wait for the owner unless the item is `needs owner`.
 4. The plan, the README and the backlog are updated in the same pull request as the change they describe.
 
