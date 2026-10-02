@@ -123,7 +123,13 @@ run_rig() {
       return 0
     fi
   fi
-  MISE_YES=1 mise exec "nu@$nu_version" -- nu "$dir/tasks/rig.nu" "$@"
+  # Piped from curl, stdin is this script. Hand the rig the terminal instead,
+  # so the login step can ask its one question.
+  if [ ! -t 0 ] && (: </dev/tty) 2>/dev/null; then
+    MISE_YES=1 mise exec "nu@$nu_version" -- nu "$dir/tasks/rig.nu" "$@" </dev/tty
+  else
+    MISE_YES=1 mise exec "nu@$nu_version" -- nu "$dir/tasks/rig.nu" "$@"
+  fi
 }
 
 # Run from a checkout (bootstrap.sh sitting next to tasks/rig.nu): use it as is.

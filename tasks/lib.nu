@@ -77,3 +77,30 @@ export def contents [target: path]: nothing -> list<string> {
   | sort
   | each {|file| $"($file | path split | str join '/') (open --raw $file | hash sha256)" }
 }
+
+# Where claude and other user programs live.
+export def local-bin []: nothing -> path {
+  $nu.home-dir | path join .local bin
+}
+
+# Where mise keeps its shims (one small launcher per tool).
+export def mise-shims []: nothing -> path {
+  let data = if "MISE_DATA_DIR" in $env {
+    $env.MISE_DATA_DIR
+  } else if (is-windows) {
+    $env.LOCALAPPDATA | path join mise
+  } else {
+    $env.XDG_DATA_HOME? | default ($nu.home-dir | path join .local share) | path join mise
+  }
+  $data | path join shims
+}
+
+# The folder the always-on Claude session works in.
+export def work-dir []: nothing -> path {
+  $env.RIG_WORKDIR? | default ($nu.home-dir | path join work)
+}
+
+# The name this machine shows up under in the Claude app.
+export def machine-name []: nothing -> string {
+  $env.RIG_NAME? | default (sys host | get hostname | str replace --regex '\.(local|lan)$' "")
+}

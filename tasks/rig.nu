@@ -1,5 +1,5 @@
 #!/usr/bin/env nu
-# rig.nu — the main run: tools, Claude Code, Claude config.
+# rig.nu — the main run: tools, Claude Code, Claude config, login, session.
 #
 # bootstrap.sh (macOS, Linux) or bootstrap.ps1 (Windows) gets git, mise and
 # nushell onto the machine and then runs this. The same code runs on all three.
@@ -9,18 +9,7 @@
 #   nu tasks/rig.nu [--dry-run]
 
 use lib.nu *
-
-# Where mise keeps its shims (one small launcher per tool).
-def mise-shims []: nothing -> path {
-  let data = if "MISE_DATA_DIR" in $env {
-    $env.MISE_DATA_DIR
-  } else if (is-windows) {
-    $env.LOCALAPPDATA | path join mise
-  } else {
-    $env.XDG_DATA_HOME? | default ($nu.home-dir | path join .local share) | path join mise
-  }
-  $data | path join shims
-}
+use enroll.nu *
 
 def mise-config-dir []: nothing -> path {
   $env.MISE_CONFIG_DIR? | default (
@@ -99,7 +88,7 @@ def main [
 ] {
   if $dry_run { $env.RIG_DRY_RUN = "1" }
 
-  let local_bin = $nu.home-dir | path join .local bin
+  let local_bin = local-bin
   let shims = mise-shims
   $env.PATH = [$local_bin $shims] ++ $env.PATH
 
@@ -144,6 +133,18 @@ def main [
   let apply = $env.FILE_PWD | path join apply.nu
   let flags = if (dry-run) { [--dry-run] } else { [] }
   with-env { RIG_CHANGES: "0" } { ^$nu.current-exe $apply ...$flags }
+
+  print "Login"
+
+  let logged_in = login-step
+
+  print "Session"
+
+  if $logged_in {
+    session-step
+  } else {
+    skip "always-on session: needs the login first"
+  }
 
   if (dry-run) {
     print "rig: dry run finished. Nothing was changed."
