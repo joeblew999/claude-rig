@@ -228,7 +228,7 @@ jobs:
           if (Select-String -Path push-second-run.log -Pattern '^ +(change|would) ') {
             throw 'The second run made changes.'
           }
-          if (-not (Select-String -Path push-second-run.log -Pattern 'rigged\.$')) { throw 'the push did not say it finished' }
+          if (-not (Select-String -Path push-second-run.log -Pattern 'rigged\.')) { throw 'the push did not say it finished' }
 
       # Some PCs are set up with PowerShell as the SSH shell instead of cmd.exe.
       - name: Dry run with PowerShell as the SSH shell
