@@ -12,7 +12,8 @@
 #
 # The machine must accept an SSH key without asking for a password.
 # A host seen for the first time is added to ~/.ssh/known_hosts. To keep a
-# throwaway test machine out of that file, pass --known-hosts /dev/null.
+# throwaway test machine out of that file, pass --known-hosts /dev/null
+# (--known-hosts NUL when this machine is Windows).
 
 use lib.nu *
 

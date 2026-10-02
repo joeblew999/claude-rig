@@ -198,27 +198,6 @@ jobs:
           "uname -s: exit code $LASTEXITCODE, said '$uname'"
           $global:LASTEXITCODE = 0
 
-      # Temporary, while finding out why winget is missing over SSH.
-      - name: What the SSH session can see of winget
-        run: |
-          $script = "$env:RUNNER_TEMP\winget-look.ps1"
-          Set-Content $script -Encoding ascii @'
-          $ErrorActionPreference = 'Continue'
-          'PATH entries with WindowsApps:'
-          $env:Path -split ';' | Where-Object { $_ -match 'WindowsApps' }
-          'Get-Command winget:'
-          Get-Command winget -ErrorAction SilentlyContinue | Format-List Source
-          'The per-user winget command:'
-          try { & "$env:LOCALAPPDATA\Microsoft\WindowsApps\winget.exe" --version } catch { "failed: $_" }
-          'Get-AppxPackage:'
-          try { Get-AppxPackage Microsoft.DesktopAppInstaller -ErrorAction Stop | Format-List Name, Version, InstallLocation } catch { "failed: $_" }
-          'The App Installer folder:'
-          try { Get-Item "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_8wekyb3d8bbwe\winget.exe" -ErrorAction Stop | ForEach-Object { $_.FullName; & $_.FullName --version } } catch { "failed: $_" }
-          whoami /groups
-          '@
-          ssh -n -i "$HOME\.ssh\push-test" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=NUL "$env:USERNAME@localhost" "powershell -NoProfile -ExecutionPolicy Bypass -File $script"
-          $global:LASTEXITCODE = 0
-
       - name: Dry run over SSH changes nothing
         run: |
           (Get-Command ssh).Source
