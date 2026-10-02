@@ -1,12 +1,13 @@
 #!/bin/sh
 # bootstrap.sh — macOS + Linux: install git and mise, fetch claude-rig, run it.
+# The run itself is tasks/rig.nu, the same nushell code on every OS.
 #
 #   curl -fsSL https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.sh | sh
 #   curl -fsSL .../bootstrap.sh | sh -s -- --dry-run
 #
 # Safe to repeat. Each step checks first and acts only if something is missing.
 # With --dry-run it changes nothing and reports what a real run would do.
-# Arguments are passed on to tasks/rig.sh.
+# Arguments are passed on to tasks/rig.nu.
 set -eu
 
 DRY_RUN=0
@@ -109,24 +110,40 @@ fi
 
 # --- 3. The rig itself -----------------------------------------------------
 
-# Run from a checkout (bootstrap.sh sitting next to tasks/rig.sh): use it as is.
+# mise fetches the nushell version the tool list names, then nushell runs the rig.
+run_rig() {
+  dir="$1"
+  shift
+  nu_version="$(sed -n 's/^nu = "\(.*\)"$/\1/p' "$dir/mise/claude-rig.toml")"
+  [ -n "$nu_version" ] || die "no nu version in $dir/mise/claude-rig.toml"
+  if [ "$DRY_RUN" = 1 ]; then
+    if ! have mise || ! mise where "nu@$nu_version" >/dev/null 2>&1; then
+      would "install nushell $nu_version, then the tools, Claude Code and the Claude config"
+      say "dry run finished. Nothing was changed."
+      return 0
+    fi
+  fi
+  MISE_YES=1 mise exec "nu@$nu_version" -- nu "$dir/tasks/rig.nu" "$@"
+}
+
+# Run from a checkout (bootstrap.sh sitting next to tasks/rig.nu): use it as is.
 # Piped from curl: keep a clone in RIG_DIR and bring it up to date.
 here="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || here=""
-if [ -n "$here" ] && [ -f "$here/tasks/rig.sh" ]; then
+if [ -n "$here" ] && [ -f "$here/tasks/rig.nu" ]; then
   RIG_DIR="$here"
   say "ok       rig checkout at $RIG_DIR"
 elif [ "$DRY_RUN" = 1 ]; then
   # Look at the rig without leaving a clone behind.
   would "keep a clone of the rig in $RIG_DIR"
-  if ! have git || ! have bash; then
-    would "then install the tools, Claude Code and the Claude config"
+  if ! have git; then
+    would "then install nushell, the tools, Claude Code and the Claude config"
     say "dry run finished. Nothing was changed."
     exit 0
   fi
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' EXIT
   git clone -q --depth 1 --branch "$RIG_REF" "$RIG_REPO" "$tmp/rig"
-  bash "$tmp/rig/tasks/rig.sh" "$@"
+  run_rig "$tmp/rig" "$@"
   exit 0
 elif [ -d "$RIG_DIR/.git" ]; then
   git -C "$RIG_DIR" fetch -q origin "$RIG_REF"
@@ -143,4 +160,4 @@ else
   git clone -q --branch "$RIG_REF" "$RIG_REPO" "$RIG_DIR"
 fi
 
-exec bash "$RIG_DIR/tasks/rig.sh" "$@"
+run_rig "$RIG_DIR" "$@"

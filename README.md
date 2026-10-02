@@ -12,9 +12,25 @@ curl -fsSL https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstra
 
 To see what it would change without changing anything, add `-s -- --dry-run` after `sh`.
 
-It installs git and mise if they are missing, the tools in [mise/claude-rig.toml](mise/claude-rig.toml), and Claude Code. Then it merges the config in [claude/](claude/) into `~/.claude`, after backing up what was there.
+## Rig a Windows machine
 
-Windows, login and the always-on session are not built yet. The design and build order are in [.plans/2026-10-02-01-claude-rig.md](.plans/2026-10-02-01-claude-rig.md).
+In PowerShell (no administrator rights needed):
+
+```powershell
+irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1 | iex
+```
+
+To only look:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1))) -DryRun
+```
+
+## What a run does
+
+It installs git and mise if they are missing (with winget on Windows), the tools in [mise/claude-rig.toml](mise/claude-rig.toml), and Claude Code. Then it merges the config in [claude/](claude/) into `~/.claude`, after backing up what was there.
+
+Login and the always-on session are not built yet. The design and build order are in [.plans/2026-10-02-01-claude-rig.md](.plans/2026-10-02-01-claude-rig.md).
 
 ## Update the config from the Mac
 
