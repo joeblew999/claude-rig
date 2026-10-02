@@ -53,6 +53,11 @@ export def claude-home []: nothing -> path {
   $env.CLAUDE_HOME? | default ($nu.home-dir | path join ".claude")
 }
 
+# Run a PowerShell command (Windows) and return what it prints.
+export def powershell [command: string]: nothing -> string {
+  ^powershell -NoProfile -ExecutionPolicy Bypass -Command $command | str trim
+}
+
 # True if a program is on PATH.
 export def have [program: string]: nothing -> bool {
   which $program | is-not-empty

@@ -54,10 +54,6 @@ def --env shell-path-unix [] {
 
 # --- Shell PATH: Windows ---------------------------------------------------
 
-def powershell [command: string]: nothing -> string {
-  ^powershell -NoProfile -ExecutionPolicy Bypass -Command $command | str trim
-}
-
 def --env shell-path-windows [wanted: list<path>] {
   let current = powershell "[Environment]::GetEnvironmentVariable('Path', 'User')"
     | split row ";"

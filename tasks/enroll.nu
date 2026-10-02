@@ -17,6 +17,11 @@ export def logged-in []: nothing -> bool {
 
 # Log in if needed. Returns whether the machine is logged in afterwards.
 export def --env login-step []: nothing -> bool {
+  # For CI only: exercise the session step on a machine that cannot log in.
+  if ($env.RIG_ASSUME_LOGGED_IN? | default "0") == "1" {
+    skip "login (RIG_ASSUME_LOGGED_IN is set, for tests)"
+    return true
+  }
   if (logged-in) {
     ok "logged in with a claude.ai account"
     return true
@@ -126,12 +131,51 @@ def start-session [] {
   }
 }
 
+# --- Windows: start at sign-in ---------------------------------------------
+
+# pitchfork cannot start at boot on Windows. Instead a small file in the
+# user's Startup folder starts the session when the user signs in, with no
+# window, and the session restarts itself. No administrator rights needed.
+def startup-file []: nothing -> path {
+  $env.APPDATA | path join Microsoft Windows "Start Menu" Programs Startup claude-rig.cmd
+}
+
+def startup-wanted []: nothing -> string {
+  let script = $env.FILE_PWD | path join session.nu
+  [
+    "@echo off"
+    "rem Written by claude-rig. Starts the always-on Claude session with no window."
+    $"start \"\" conhost.exe --headless \"($nu.current-exe)\" \"($script)\" --keep-alive"
+    ""
+  ] | str join "\r\n"
+}
+
+def windows-session-running []: nothing -> bool {
+  ps --long | where {|process| ($process.command? | default "") =~ 'session\.nu' and $process.pid != $nu.pid } | is-not-empty
+}
+
+def --env session-windows [] {
+  let file = startup-file
+  let wanted = startup-wanted
+  let changed = (read-text $file) != $wanted
+  if $changed {
+    change $"start the session at sign-in \(($file))" { $wanted | save --force $file }
+  } else {
+    ok $"session starts at sign-in \(($file))"
+  }
+  if (windows-session-running) and not $changed {
+    ok $"session is running as \"(machine-name)\""
+  } else {
+    change $"start the session as \"(machine-name)\"" {
+      # Stop an older session first, so two never run side by side.
+      powershell "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'session\.nu' } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }"
+      ^cmd /c $file
+    }
+  }
+}
+
 # Keep a Claude session running on this machine.
 export def --env session-step [] {
-  if (is-windows) {
-    skip "always-on session: not built for Windows yet. To start one by hand: claude remote-control"
-    return
-  }
   let dir = work-dir
   if ($dir | path exists) {
     ok $"work folder \(($dir))"
@@ -139,6 +183,10 @@ export def --env session-step [] {
     change $"create the work folder ($dir)" { mkdir $dir }
   }
   trust-work-dir
+  if (is-windows) {
+    session-windows
+    return
+  }
   let changed = configure-daemon
   start-at-boot
   if $changed {
