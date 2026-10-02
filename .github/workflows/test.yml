@@ -47,6 +47,12 @@ jobs:
           jq -e '.remoteControlAtStartup == true' "$HOME/.claude/settings.json"
           test -f "$HOME/.claude/skills/mise-tasks/SKILL.md"
 
+      - name: Doctor reports this machine
+        run: |
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+          nu tasks/doctor.nu --json | tee doctor.json
+          jq -e '.tools_installed and .config_applied and (.logged_in | not) and (.claude_version != null)' doctor.json
+
       - name: Second run changes nothing
         run: |
           sh bootstrap.sh | tee second-run.log
@@ -86,6 +92,15 @@ jobs:
           $settings = Get-Content "$HOME\.claude\settings.json" -Raw | ConvertFrom-Json
           if (-not $settings.remoteControlAtStartup) { throw 'remote control is not on' }
           if (-not (Test-Path "$HOME\.claude\skills\mise-tasks\SKILL.md")) { throw 'skills are missing' }
+
+      - name: Doctor reports this machine
+        run: |
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
+          $report = nu tasks\doctor.nu --json | Out-String
+          $report
+          $facts = $report | ConvertFrom-Json
+          if (-not ($facts.tools_installed -and $facts.config_applied -and $facts.claude_version)) { throw 'the report is wrong' }
+          if ($facts.logged_in) { throw 'the runner cannot be logged in' }
 
       - name: Second run changes nothing
         run: |

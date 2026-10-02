@@ -7,8 +7,8 @@ description = "Rig this machine: tools, Claude Code, Claude config. Pass --dry-r
 run = "nu tasks/rig.nu"
 
 [tasks.doctor]
-description = "Show what is set up on this machine and what is missing. Changes nothing."
-run = "nu tasks/rig.nu --dry-run"
+description = "Show what is set up on this machine and what is missing. Changes nothing. Pass --json for a machine-readable report."
+run = "nu tasks/doctor.nu"
 
 [tasks.apply]
 description = "Apply claude/ to this machine's ~/.claude. Pass --dry-run to only look."

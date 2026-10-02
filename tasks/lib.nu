@@ -83,6 +83,12 @@ export def contents [target: path]: nothing -> list<string> {
   | each {|file| $"($file | path split | str join '/') (open --raw $file | hash sha256)" }
 }
 
+# The tools that mise still has to install, looking only at the machine-wide list.
+export def missing-tools []: nothing -> string {
+  cd $nu.home-dir
+  ^mise ls --current --missing | complete | get stdout | str trim
+}
+
 # Where claude and other user programs live.
 export def local-bin []: nothing -> path {
   $nu.home-dir | path join .local bin

@@ -117,7 +117,7 @@ def --env start-at-boot [] {
   }
 }
 
-def session-running []: nothing -> bool {
+def pitchfork-session-running []: nothing -> bool {
   let list = ^pitchfork list --hide-header | complete | get stdout
   let name = '(^|/)' + $DAEMON + '\s'
   $list | lines | any {|line| $line =~ $name and $line =~ '\srunning' }
@@ -129,6 +129,11 @@ def start-session [] {
     print --stderr ($result.stderr | str trim)
     fail rig $"the session did not start. See: pitchfork logs ($DAEMON)"
   }
+}
+
+# True if the always-on session is up on this machine.
+export def session-running []: nothing -> bool {
+  if (is-windows) { windows-session-running } else if (have pitchfork) { pitchfork-session-running } else { false }
 }
 
 # --- Windows: start at sign-in ---------------------------------------------
@@ -191,7 +196,7 @@ export def --env session-step [] {
   start-at-boot
   if $changed {
     change $"start the session as \"(machine-name)\"" { start-session }
-  } else if (session-running) {
+  } else if (pitchfork-session-running) {
     ok $"session is running as \"(machine-name)\""
   } else {
     change $"start the session as \"(machine-name)\"" { start-session }
