@@ -40,15 +40,19 @@ def probe [options: list<string>, target: string, command: string]: nothing -> r
 def remote-os [options: list<string>, target: string]: nothing -> string {
   let uname = probe $options $target "uname -s"
   if $uname.exit_code == 0 {
-    return (match ($uname.stdout | str trim) {
-      "Darwin" => "macOS"
-      "Linux" => "Linux"
-      $other => (fail push $"($target) runs ($other), which the rig does not support.")
-    })
+    let name = $uname.stdout | str trim
+    if $name == "Darwin" { return "macOS" }
+    if $name == "Linux" { return "Linux" }
+    # A Windows machine with Git for Windows can have a uname on PATH. It
+    # answers with a name like MINGW64_NT-10.0 or MSYS_NT-10.0.
+    if $name !~ '^(MINGW|MSYS|CYGWIN)' {
+      fail push $"($target) runs ($name), which the rig does not support."
+    }
   }
-  # Windows OpenSSH hands the command to cmd.exe, which has no uname.
-  let powershell = probe $options $target 'powershell -NoProfile -Command "$PSVersionTable.PSVersion.Major"'
-  if $powershell.exit_code == 0 { return "Windows" }
+  # Otherwise Windows OpenSSH handed the command to cmd.exe, which has no
+  # uname. Ask PowerShell, which every supported Windows has.
+  let powershell = probe $options $target 'powershell -NoProfile -Command "[Environment]::OSVersion.Platform"'
+  if $powershell.exit_code == 0 and ($powershell.stdout | str trim) == "Win32NT" { return "Windows" }
   fail push $"could not tell which OS ($target) runs \(no uname and no PowerShell)."
 }
 
@@ -73,17 +77,18 @@ def unix-command [fetcher: string, ref: string, dry_run: bool]: nothing -> strin
   ["sh -c 'script=$(" $download ') && printf "%s\n" "$script" | ' $run "'"] | str join
 }
 
-# The Windows command line, written for cmd.exe (the default shell of Windows
-# OpenSSH). Everything PowerShell has to see is inside one pair of double
-# quotes, where cmd leaves & | ( ) and ; alone. Not yet tried on a real
-# Windows host: this is the one place to fix if the quoting is wrong.
+# The Windows command line. Windows OpenSSH hands it to the account's SSH
+# shell, which is cmd.exe unless the PC was set up otherwise. Everything
+# PowerShell has to see is inside one pair of double quotes, where cmd leaves
+# & | ( ) and ; alone. Inside them there is no $, no backtick and no double
+# quote, so the line also means the same when the SSH shell is PowerShell.
 def windows-command [ref: string, dry_run: bool]: nothing -> string {
   let script = [
-    $"$env:RIG_REF='($ref)'; "
-    $"& \([scriptblock]::Create\(\(irm (raw-url $ref bootstrap.ps1))))"
+    "[Environment]::SetEnvironmentVariable('RIG_REF', '" $ref "'); "
+    "& ([scriptblock]::Create((irm " (raw-url $ref bootstrap.ps1) ")))"
     (if $dry_run { " -DryRun" } else { "" })
   ] | str join
-  $'powershell -NoProfile -ExecutionPolicy Bypass -Command "($script)"'
+  ['powershell -NoProfile -ExecutionPolicy Bypass -Command "' $script '"'] | str join
 }
 
 # Run the bootstrap on the remote, showing its output live. Returns its exit code.

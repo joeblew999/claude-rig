@@ -127,3 +127,99 @@ jobs:
           if (Select-String -Path session-second-run.log -Pattern '^ +(change|would) ') {
             throw 'The second run with the session made changes.'
           }
+
+  # push.nu against a Windows SSH server set up the way a real PC would be:
+  # OpenSSH Server from Windows' own optional features, an administrator
+  # account, the key in administrators_authorized_keys, and cmd.exe as the
+  # SSH shell. The runner pushes to itself over localhost.
+  push-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: powershell
+    env:
+      # Rig from the branch under test, not from main.
+      RIG_TEST_REF: ${{ github.head_ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only nushell is needed here, to run push.nu.
+      - uses: jdx/mise-action@v2
+        with:
+          install_args: nu
+
+      - name: Install and start OpenSSH Server
+        run: |
+          if (Get-Service sshd -ErrorAction SilentlyContinue) {
+            'sshd is already on this image'
+          } else {
+            Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+          }
+          # With no DefaultShell value, the SSH shell is cmd.exe.
+          Remove-ItemProperty -Path HKLM:\SOFTWARE\OpenSSH -Name DefaultShell -ErrorAction SilentlyContinue
+          Start-Service sshd
+          Get-Service sshd
+          Get-Content "$env:ProgramData\ssh\sshd_config" | Where-Object { $_ -notmatch '^\s*(#|$)' }
+          # Use Windows' own ssh for the push, not the one that comes with Git.
+          Add-Content $env:GITHUB_PATH "$env:SystemRoot\System32\OpenSSH"
+
+      - name: Authorize a throwaway key
+        run: |
+          $ssh = "$HOME\.ssh"
+          New-Item -ItemType Directory -Force $ssh | Out-Null
+          ssh-keygen -q -t ed25519 -N '""' -f "$ssh\push-test"
+          if ($LASTEXITCODE -ne 0) { throw 'could not make a key' }
+          $public = Get-Content "$ssh\push-test.pub"
+          Add-Content "$ssh\authorized_keys" $public -Encoding ascii
+          # An administrator's keys are read from this file, and only if
+          # nobody but Administrators and SYSTEM can touch it.
+          $admin = "$env:ProgramData\ssh\administrators_authorized_keys"
+          Set-Content $admin $public -Encoding ascii
+          icacls.exe $admin /inheritance:r /grant '*S-1-5-32-544:F' /grant '*S-1-5-18:F'
+          if ($LASTEXITCODE -ne 0) { throw 'could not set the permissions' }
+          # For CI only: the SSH session does not get this step's environment,
+          # and without a token mise hits GitHub's anonymous rate limit.
+          [Environment]::SetEnvironmentVariable('GITHUB_TOKEN', $env:GITHUB_TOKEN, 'User')
+
+      - name: Dry run over SSH changes nothing
+        run: |
+          (Get-Command ssh).Source
+          mise exec -- nu tasks/push.nu "$env:USERNAME@localhost" --identity "$HOME\.ssh\push-test" --known-hosts NUL --ref $env:RIG_TEST_REF --dry-run
+          if ($LASTEXITCODE -ne 0) { throw "the push failed with exit code $LASTEXITCODE" }
+          if (Test-Path "$HOME\.claude-rig") { throw 'the dry run left a clone of the rig' }
+          if (Test-Path "$HOME\.config\mise\conf.d\claude-rig.toml") { throw 'the dry run installed the tool list' }
+          if (Test-Path "$HOME\.claude\.rig-manifest") { throw 'the dry run applied the config' }
+          if (Test-Path "$HOME\.local\bin\claude.exe") { throw 'the dry run installed Claude Code' }
+
+      - name: First run over SSH
+        run: |
+          mise exec -- nu tasks/push.nu "$env:USERNAME@localhost" --identity "$HOME\.ssh\push-test" --known-hosts NUL --ref $env:RIG_TEST_REF
+          if ($LASTEXITCODE -ne 0) { throw "the push failed with exit code $LASTEXITCODE" }
+
+      - name: Claude Code and config are in place
+        run: |
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
+          claude --version
+          if ($LASTEXITCODE -ne 0) { throw 'claude does not run' }
+          if (-not (Test-Path "$HOME\.claude\settings.json")) { throw 'the Claude config is missing' }
+
+      - name: Second run over SSH changes nothing
+        run: |
+          mise exec -- nu tasks/push.nu "$env:USERNAME@localhost" --identity "$HOME\.ssh\push-test" --known-hosts NUL --ref $env:RIG_TEST_REF | Tee-Object push-second-run.log
+          if ($LASTEXITCODE -ne 0) { throw "the push failed with exit code $LASTEXITCODE" }
+          if (Select-String -Path push-second-run.log -Pattern '^ +(change|would) ') {
+            throw 'The second run made changes.'
+          }
+          if (-not (Select-String -Path push-second-run.log -Pattern 'rigged\.$')) { throw 'the push did not say it finished' }
+
+      # Some PCs are set up with PowerShell as the SSH shell instead of cmd.exe.
+      - name: Dry run with PowerShell as the SSH shell
+        run: |
+          New-ItemProperty -Path HKLM:\SOFTWARE\OpenSSH -Name DefaultShell -PropertyType String -Force -Value "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" | Out-Null
+          mise exec -- nu tasks/push.nu "$env:USERNAME@localhost" --identity "$HOME\.ssh\push-test" --known-hosts NUL --ref $env:RIG_TEST_REF --dry-run | Tee-Object push-powershell.log
+          if ($LASTEXITCODE -ne 0) { throw "the push failed with exit code $LASTEXITCODE" }
+          if (-not (Select-String -Path push-powershell.log -Pattern 'rig: dry run finished')) { throw 'the rig did not run on the remote' }
