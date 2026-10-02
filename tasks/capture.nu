@@ -53,7 +53,8 @@ def files-matching [root: path, pattern: string]: nothing -> list<string> {
 
 def main [] {
   let src = claude-home
-  let dest = repo-dir | path join claude
+  # RIG_CAPTURE_DEST is for the tests, which must not write into the repo.
+  let dest = $env.RIG_CAPTURE_DEST? | default (repo-dir | path join claude)
   if not ($src | path exists) { fail capture $"no Claude config at ($src)" }
 
   let tmp = mktemp --directory | path expand

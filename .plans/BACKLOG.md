@@ -22,7 +22,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | `unrig`: take a machine out of the fleet | This Mac and the Windows 11 VM: unrig, unrig again (nothing to do), rig again (session back) |
 | `fleet`: every rigged machine in one table | This Mac, the Windows 11 VM and the Ubuntu VM, side by side. `push` adds a machine to the list; the list stays on the Mac, outside the repo |
 | First release: `v0.1.0`, a pre-release | Tagged on the commit where every CI job on main passed, including the ARM64 push test |
-| Tests for the config merge (`mise run test`) | This Mac and CI on all five runners: a fresh machine, a machine with its own config, a changed skill, a dropped skill, broken settings. Checked once that breaking the merge fails the tests |
+| Tests (`mise run test`) | This Mac and CI on all five runners. The config merge: a fresh machine, a machine with its own config, a changed skill, a dropped skill, broken settings. Capture: secret-named settings and Mac-only keys dropped, synced skills left out, and a GitHub token, an Anthropic key, a private key or a path under the home folder each stop it with what was captured before untouched. Checked once for each that breaking the code fails the tests |
 | Licence: MIT, the same as the UTM repo | The lead chose it after asking twice; the owner can change it |
 | AGENTS.md and this backlog | |
 
@@ -69,6 +69,6 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 | nur as the task runner | Looked at on 2 Oct 2026: active (released 28 Sep 2026, built on the same nushell 0.116 the rig pins), tasks are nushell functions in one `nurfile`. Verdict: not now. mise has to be on every machine anyway to install the tools, and it already runs the nushell tasks, so nur would be a second runner to install and keep in step on three OSes. Worth another look if the tasks grow shared arguments and sub-commands that mise handles badly |
 | Windows session with nobody signed in | The session starts at sign-in. A PC that reboots unattended needs auto sign-in or a service, which needs administrator rights |
 | Keep the Windows session log small | `~/.claude-rig-session.log` is started fresh on each start but grows while the server runs |
-| Tests for the other tasks | `apply` has tests. `capture`, `doctor`, `fleet` and the session steps are covered only by the CI runs and by hand |
+| Tests for the other tasks | `apply` and `capture` have tests. `doctor`, `fleet` and the session steps are covered only by the CI runs and by hand |
 | A dedicated user for the session | The plan asks for it where the OS allows |
 | Product basics | A changelog. Releases have started (`v0.1.0`) |

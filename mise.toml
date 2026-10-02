@@ -31,8 +31,8 @@ description = "Rig a remote machine over SSH: mise run push user@host. Pass --dr
 run = "nu tasks/push.nu"
 
 [tasks.test]
-description = "Run the tests: the config merge against throwaway Claude folders"
-run = "nu tests/apply.nu"
+description = "Run the tests: the config merge and the capture checks, against throwaway folders"
+run = ["nu tests/apply.nu", "nu tests/capture.nu"]
 
 [tasks.lint]
 description = "Check the scripts"
