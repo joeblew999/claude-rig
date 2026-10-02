@@ -5,14 +5,21 @@
 #   curl -fsSL .../bootstrap.sh | sh -s -- --dry-run
 #
 # Safe to repeat. Each step checks first and acts only if something is missing.
+# With --dry-run it changes nothing and reports what a real run would do.
 # Arguments are passed on to tasks/rig.sh.
 set -eu
+
+DRY_RUN=0
+for arg in "$@"; do
+  if [ "$arg" = "--dry-run" ]; then DRY_RUN=1; fi
+done
 
 RIG_REPO="${RIG_REPO:-https://github.com/joeblew999/claude-rig.git}"
 RIG_REF="${RIG_REF:-main}"
 RIG_DIR="${RIG_DIR:-$HOME/.claude-rig}"
 
 say() { echo "bootstrap: $*"; }
+would() { say "would    $*"; }
 die() { echo "bootstrap: $*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
@@ -60,6 +67,8 @@ case "$(uname -s)" in
   Darwin)
     if xcode-select -p >/dev/null 2>&1; then
       say "ok       git (Command Line Tools)"
+    elif [ "$DRY_RUN" = 1 ]; then
+      would "install the Xcode Command Line Tools (git)"
     else
       install_macos_clt
     fi
@@ -71,6 +80,8 @@ case "$(uname -s)" in
     have bash || missing="$missing bash"
     if [ -z "$missing" ]; then
       say "ok       git, curl, bash"
+    elif [ "$DRY_RUN" = 1 ]; then
+      would "install$missing"
     else
       say "installing$missing"
       # shellcheck disable=SC2086
@@ -88,6 +99,8 @@ PATH="$HOME/.local/bin:$PATH"
 export PATH
 if have mise; then
   say "ok       mise"
+elif [ "$DRY_RUN" = 1 ]; then
+  would "install mise"
 else
   say "installing mise"
   curl -fsSL https://mise.run | sh
@@ -102,6 +115,19 @@ here="$(cd "$(dirname "$0")" 2>/dev/null && pwd || true)"
 if [ -n "$here" ] && [ -f "$here/tasks/rig.sh" ]; then
   RIG_DIR="$here"
   say "ok       rig checkout at $RIG_DIR"
+elif [ "$DRY_RUN" = 1 ]; then
+  # Look at the rig without leaving a clone behind.
+  would "keep a clone of the rig in $RIG_DIR"
+  if ! have git || ! have bash; then
+    would "then install the tools, Claude Code and the Claude config"
+    say "dry run finished. Nothing was changed."
+    exit 0
+  fi
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  git clone -q --depth 1 --branch "$RIG_REF" "$RIG_REPO" "$tmp/rig"
+  bash "$tmp/rig/tasks/rig.sh" "$@"
+  exit 0
 elif [ -d "$RIG_DIR/.git" ]; then
   git -C "$RIG_DIR" fetch -q origin "$RIG_REF"
   if [ "$(git -C "$RIG_DIR" rev-parse HEAD)" = "$(git -C "$RIG_DIR" rev-parse FETCH_HEAD)" ]; then

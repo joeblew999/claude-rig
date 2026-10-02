@@ -1,0 +1,54 @@
+# Runs the bootstrap on fresh macOS and Linux machines.
+# The second run must change nothing.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck -x bootstrap.sh tasks/*.sh
+
+  bootstrap:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      # Lets mise read GitHub releases without hitting the anonymous rate limit.
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dry run changes nothing
+        run: |
+          sh bootstrap.sh --dry-run
+          test ! -e "$HOME/.config/mise/conf.d/claude-rig.toml"
+          test ! -e "$HOME/.claude/.rig-manifest"
+
+      - name: First run
+        run: sh bootstrap.sh
+
+      - name: Tools and config are in place
+        run: |
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+          claude --version
+          for tool in gh jq yq rg fd node go bun nu fnox pitchfork; do
+            command -v "$tool"
+          done
+          jq -e '.remoteControlAtStartup == true' "$HOME/.claude/settings.json"
+          test -f "$HOME/.claude/skills/mise-tasks/SKILL.md"
+
+      - name: Second run changes nothing
+        run: |
+          sh bootstrap.sh | tee second-run.log
+          if grep -E '^ +(change|would) ' second-run.log; then
+            echo "The second run made changes." >&2
+            exit 1
+          fi

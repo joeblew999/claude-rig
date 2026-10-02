@@ -18,7 +18,9 @@ MISE_CONF_DIR="${MISE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mise}"
 MISE_SHIMS="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims"
 export PATH="$HOME/.local/bin:$MISE_SHIMS:$PATH"
 
-have mise || die "mise is missing. Run bootstrap.sh first."
+if ! have mise; then
+  [ "$DRY_RUN" = 1 ] || die "mise is missing. Run bootstrap.sh first."
+fi
 
 # --- Tools -----------------------------------------------------------------
 
@@ -35,7 +37,7 @@ install_tool_list() {
 # Run from the home folder so only the machine-wide tool list is in play.
 install_tools() { (cd "$HOME" && mise install --yes); }
 
-if cmp -s "$TOOLS_SRC" "$TOOLS_DEST" 2>/dev/null; then
+if cmp -s "$TOOLS_SRC" "$TOOLS_DEST" 2>/dev/null && have mise; then
   ok "tool list ($TOOLS_DEST)"
   if [ -z "$(cd "$HOME" && mise ls --current --missing 2>/dev/null)" ]; then
     ok "tools installed"
