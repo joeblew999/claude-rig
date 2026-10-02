@@ -48,19 +48,34 @@ function Invoke-Bootstrap {
         $env:Path = (($all -split ';') | Where-Object { $_ } | Select-Object -Unique) -join ';'
     }
 
+    # Where winget is, or nothing. In an SSH session the `winget` command is
+    # often not there: Windows only sets it up for someone signed in at the
+    # screen. The program itself is still in the App Installer folder, which
+    # an administrator can read.
+    function Find-Winget {
+        $command = Get-Command winget -ErrorAction SilentlyContinue
+        if ($command) { return $command.Source }
+        $packaged = Join-Path $env:ProgramFiles 'WindowsApps\Microsoft.DesktopAppInstaller_*_8wekyb3d8bbwe\winget.exe'
+        $found = @(Get-Item $packaged -ErrorAction SilentlyContinue | Sort-Object LastWriteTime)
+        if ($found.Count -gt 0) { return $found[-1].FullName }
+        return $null
+    }
+
     function Install-WithWinget($id, $program) {
-        if (-not (Have winget)) {
+        $winget = Find-Winget
+        if (-not $winget) {
             # A fresh Windows install can have winget present but not yet registered.
             try {
                 Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe
             } catch { }
             Update-Path
+            $winget = Find-Winget
         }
-        if (-not (Have winget)) {
+        if (-not $winget) {
             throw 'bootstrap: winget is missing. Install "App Installer" from the Microsoft Store, then run again.'
         }
         Say "installing $program with winget"
-        & winget install --id $id --exact --source winget --silent --accept-package-agreements --accept-source-agreements
+        & $winget install --id $id --exact --source winget --silent --accept-package-agreements --accept-source-agreements
         $code = $LASTEXITCODE
         Update-Path
         if (-not (Have $program)) { throw "bootstrap: winget could not install $id (exit code $code)" }
