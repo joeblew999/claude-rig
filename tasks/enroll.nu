@@ -159,6 +159,21 @@ def windows-session-running []: nothing -> bool {
   ps --long | where {|process| ($process.command? | default "") =~ 'session\.nu' and $process.pid != $nu.pid } | is-not-empty
 }
 
+# Start the sign-in entry now, on the signed-in user's desktop.
+#
+# A program started from an SSH connection belongs to that connection and is
+# stopped when it closes, so the session cannot simply be started from here.
+# The Task Scheduler starts it on the desktop instead, with a task that is
+# used once and removed. If that is refused, start it directly: right when
+# the rig is run from a window on the desktop itself.
+def start-on-desktop [file: path] {
+  const TASK = "claude-rig-start"
+  let created = ^schtasks /create /tn $TASK /tr $"\"($file)\"" /sc once /st "00:00" /ru $env.USERNAME /it /f | complete
+  let ran = if $created.exit_code == 0 { ^schtasks /run /tn $TASK | complete } else { $created }
+  if $created.exit_code == 0 { ^schtasks /delete /tn $TASK /f | complete | ignore }
+  if $ran.exit_code != 0 { ^cmd /c $file }
+}
+
 def --env session-windows [] {
   let file = startup-file
   let wanted = startup-wanted
@@ -174,7 +189,7 @@ def --env session-windows [] {
     change $"start the session as \"(machine-name)\"" {
       # Stop an older session first, so two never run side by side.
       powershell 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "session\.nu" } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }'
-      ^cmd /c $file
+      start-on-desktop $file
     }
   }
 }
