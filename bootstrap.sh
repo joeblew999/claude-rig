@@ -111,7 +111,7 @@ fi
 
 # Run from a checkout (bootstrap.sh sitting next to tasks/rig.sh): use it as is.
 # Piped from curl: keep a clone in RIG_DIR and bring it up to date.
-here="$(cd "$(dirname "$0")" 2>/dev/null && pwd || true)"
+here="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || here=""
 if [ -n "$here" ] && [ -f "$here/tasks/rig.sh" ]; then
   RIG_DIR="$here"
   say "ok       rig checkout at $RIG_DIR"
