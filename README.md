@@ -42,6 +42,15 @@ mise run fleet
 
 One table with this machine and every machine rigged from here with `push`: its OS, whether the tools are in, whether Claude is logged in, and whether the session is running. `mise run fleet -- add user@host` adds a machine that was rigged by hand. The list is kept in `~/.config/claude-rig/machines.json` on the Mac, not in this repo.
 
+## Give a machine work
+
+```sh
+mise run fleet -- run user@host "run the tests and tell me what fails"
+mise run fleet -- run --all "what version of node do you have?"
+```
+
+Claude runs the work on that machine, in its work folder (`~/work`), and the answer comes back here. `--all` gives every machine the same work at the same time. The machine must be logged in.
+
 ## What a run does
 
 It installs git and mise if they are missing (with winget on Windows), the tools in [mise/claude-rig.toml](mise/claude-rig.toml), and Claude Code. Then it merges the config in [claude/](claude/) into `~/.claude`, after backing up what was there.

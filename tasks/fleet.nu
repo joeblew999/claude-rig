@@ -93,13 +93,13 @@ def work-on [os: string, work: string]: nothing -> record {
       input: ([
         $"$work = [Text.Encoding]::UTF8.GetString\([Convert]::FromBase64String\('($encoded)'))"
         '$env:Path = "$HOME\.local\bin;$env:LOCALAPPDATA\mise\shims;$env:Path"'
-        'Set-Location "$HOME\work"'
+        'New-Item -ItemType Directory -Force "$HOME\work" | Out-Null; Set-Location "$HOME\work"'
         '$work | claude -p'
       ] | str join "\n")
     }
   } else {
     {
-      command: 'cd "$HOME/work" && PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH" claude -p'
+      command: 'mkdir -p "$HOME/work" && cd "$HOME/work" && PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH" claude -p'
       input: $work
     }
   }
