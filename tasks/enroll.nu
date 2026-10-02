@@ -168,7 +168,7 @@ def --env session-windows [] {
   } else {
     change $"start the session as \"(machine-name)\"" {
       # Stop an older session first, so two never run side by side.
-      powershell "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'session\.nu' } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }"
+      powershell 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "session\.nu" } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }'
       ^cmd /c $file
     }
   }
