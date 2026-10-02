@@ -10,6 +10,10 @@ run = "nu tasks/rig.nu"
 description = "Show what is set up on this machine and what is missing. Changes nothing. Pass --json for a machine-readable report."
 run = "nu tasks/doctor.nu"
 
+[tasks.fleet]
+description = "Every rigged machine in one table: this one and each machine rigged from here with push."
+run = "nu tasks/fleet.nu"
+
 [tasks.unrig]
 description = "Take this machine out of the fleet: stop the always-on session. Pass --dry-run to only look."
 run = "nu tasks/unrig.nu"

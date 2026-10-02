@@ -152,7 +152,9 @@ function Invoke-Bootstrap {
                 throw "bootstrap: $rigDir has local changes. Commit or discard them, then run again."
             } else {
                 Say "updating $rigDir"
-                Run git -C $rigDir merge -q --ff-only FETCH_HEAD
+                # Move to exactly what was fetched. This also works when the branch was
+                # rewritten, or when RIG_REF names a different branch than last time.
+                Run git -C $rigDir checkout -q --detach FETCH_HEAD
             }
         } else {
             Say "cloning the rig into $rigDir"

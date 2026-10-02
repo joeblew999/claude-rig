@@ -20,6 +20,7 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | One-line bootstrap on a real Linux machine with systemd | A fresh Ubuntu 24.04 VM in OrbStack. It stops at the login step, as designed |
 | `doctor`: a short report on the machine, and `--json` for a control plane | This Mac, and CI on all five runners |
 | `unrig`: take a machine out of the fleet | This Mac and the Windows 11 VM: unrig, unrig again (nothing to do), rig again (session back) |
+| `fleet`: every rigged machine in one table | This Mac, the Windows 11 VM and the Ubuntu VM, side by side. `push` adds a machine to the list; the list stays on the Mac, outside the repo |
 | AGENTS.md and this backlog | |
 
 ## Next
@@ -57,7 +58,7 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 
 | Item | Notes |
 |---|---|
-| Control plane: see every machine in one place | The owner's Cloudflare Worker in irgo-windows-vm is the place. Its ledger could take a check-in today only as a hack, and a plan there (`.plans/2026-10-01_1520_device-schema.md`) already proposes a devices API that is waiting on four owner decisions. `doctor --json` is the check-in a machine would send; post it to that API once it exists. Before then, a `fleet` task could run `doctor --json` on every machine over SSH and show one table. The Claude app already shows which machines are connected |
+| Control plane: see every machine in one place | The owner's Cloudflare Worker in irgo-windows-vm is the place. Its ledger could take a check-in today only as a hack, and a plan there (`.plans/2026-10-01_1520_device-schema.md`) already proposes a devices API that is waiting on four owner decisions. `doctor --json` is the check-in a machine would send; post it to that API once it exists. Until then, `mise run fleet` on the Mac is the control plane: it asks each machine over SSH. It only sees machines the Mac can reach. The Claude app already shows which machines are connected |
 | Sort out the overlap with the UTM repo | The owner wants no loose ends: decide what lives where, shared naming, and whether the repos merge. Starts after this ships. First seam: irgo-winvm runs the bootstrap before it takes the golden image (plan step 6) |
 | Look at nur as the task runner | The owner pointed at https://github.com/nur-taskrunner/nur, a task runner where the tasks are nushell. Today mise runs the tasks and needs to be there anyway for the tools, so the question is whether nur adds enough |
 | Windows session with nobody signed in | The session starts at sign-in. A PC that reboots unattended needs auto sign-in or a service, which needs administrator rights |

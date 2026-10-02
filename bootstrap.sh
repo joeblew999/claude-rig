@@ -159,7 +159,9 @@ elif [ -d "$RIG_DIR/.git" ]; then
     die "$RIG_DIR has local changes. Commit or discard them, then run again."
   else
     say "updating $RIG_DIR"
-    git -C "$RIG_DIR" merge -q --ff-only FETCH_HEAD
+    # Move to exactly what was fetched. This also works when the branch was
+    # rewritten, or when RIG_REF names a different branch than last time.
+    git -C "$RIG_DIR" checkout -q --detach FETCH_HEAD
   fi
 else
   say "cloning the rig into $RIG_DIR"
