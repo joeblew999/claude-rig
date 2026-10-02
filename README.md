@@ -26,6 +26,14 @@ To only look:
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1))) -DryRun
 ```
 
+## Rig a machine from the Mac, over SSH
+
+```sh
+mise run push user@host
+```
+
+It works out which OS is on the other end and runs the right bootstrap there. The machine must accept your SSH key. Add `--dry-run` to only look. Tested against Linux; not yet against a Windows or macOS machine.
+
 ## What a run does
 
 It installs git and mise if they are missing (with winget on Windows), the tools in [mise/claude-rig.toml](mise/claude-rig.toml), and Claude Code. Then it merges the config in [claude/](claude/) into `~/.claude`, after backing up what was there.
@@ -35,7 +43,7 @@ Then it logs in and starts the always-on session:
 - **Login.** If the machine is not logged in, Claude prints a link. Open it on any device, approve, and paste the code back. This is the one step that needs you, once per machine.
 - **Session.** [pitchfork](https://pitchfork.jdx.dev) keeps `claude remote-control` running in `~/work` and brings it back after a reboot. The machine then shows up in the Claude app under its own name.
 
-The always-on session is built for macOS and Linux. On Windows the rig installs everything and logs in, and the session part is next.
+On Windows, pitchfork cannot start at boot, so the session starts when the user signs in (a small file in the Startup folder) and restarts itself. A Windows machine that reboots with nobody signed in stays offline until someone signs in.
 
 `mise run doctor` (in `~/.claude-rig`) shows what is set up and what is missing without changing anything. The design is in [the plan](.plans/2026-10-02-01-claude-rig.md), and what is done and what is next is in [the backlog](.plans/BACKLOG.md).
 
