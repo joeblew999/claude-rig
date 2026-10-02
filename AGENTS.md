@@ -34,6 +34,7 @@ The lead decides when to bring in helpers. Use them when items do not touch the 
 - **Services run under pitchfork.** Use the OS's own service manager only for what pitchfork cannot do, and say why.
 - **Never destroy local state.** Back up before the first change, merge rather than overwrite, and never copy or overwrite `~/.claude.json`.
 - **Nushell traps found so far.** Do not `glob` an absolute path (it fails on Windows backslashes): `cd` there and glob a relative pattern, or use `ls`. Do not put a regex with `(` inside an interpolated string. Use `str lowercase`, not `str downcase`.
+- **Windows traps found so far.** A program started from an SSH connection is stopped when the connection closes: start anything long-lived through the Task Scheduler (see `start-on-desktop` in `tasks/enroll.nu`). To run PowerShell on a Windows machine over SSH, send the script on stdin to `powershell -Command -`; quoting it through cmd.exe goes wrong.
 - **Say where it was tested.** Fresh CI runners, a Docker container, this Mac, a real Windows PC and a UTM VM are different things. Name the one that was used. Never write that something works on a platform it was not run on.
 - **Plain English** in messages, comments and docs.
 

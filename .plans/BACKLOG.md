@@ -15,11 +15,11 @@ Status: `done`, `doing`, `next`, `later`, `needs owner`.
 | `--dry-run` that changes nothing, even on a bare machine | CI on all five runners |
 | Login step: `claude auth login` with a claude.ai account | This Mac (already logged in). The login prompt itself has not been run on a new machine |
 | Always-on session under pitchfork, back after a reboot | This Mac: starts, shows in the Claude app, the rig restarts it when stopped. Not rebooted. Linux is the same code, not yet run on a real Linux machine with a login |
-| Always-on session on Windows, started at sign-in | CI on Windows x64 and ARM64 checks the sign-in entry and the restart loop. The runner cannot log in, so the server connecting is not tested: that needs a real Windows machine |
+| Always-on session on Windows, started at sign-in | CI on Windows x64 and ARM64, and the Windows 11 VM in UTM over SSH: the sign-in entry, the restart loop, the session surviving the SSH connection closing, a second run changing nothing. The server connecting is not tested until that VM is logged in |
 | `push`: rig a remote machine over SSH from the Mac | Ubuntu containers over SSH, and the Windows 11 ARM64 VM in UTM set up like the office PC (OpenSSH Server, key in `administrators_authorized_keys`, cmd as the shell): dry run, real run from nothing, second run with no changes. Not tested against macOS, or a machine whose sudo asks for a password |
 | One-line bootstrap on a real Linux machine with systemd | A fresh Ubuntu 24.04 VM in OrbStack. It stops at the login step, as designed |
 | `doctor`: a short report on the machine, and `--json` for a control plane | This Mac, and CI on all five runners |
-| `unrig`: take a machine out of the fleet | This Mac: unrig, unrig again (nothing to do), rig again (session back). The Windows half has not been run |
+| `unrig`: take a machine out of the fleet | This Mac and the Windows 11 VM: unrig, unrig again (nothing to do), rig again (session back) |
 | AGENTS.md and this backlog | |
 
 ## Next
