@@ -202,3 +202,40 @@ export def --env session-step [] {
     change $"start the session as \"(machine-name)\"" { start-session }
   }
 }
+
+# --- Taking the session away again -----------------------------------------
+
+# Stop the always-on session and take out what starts it. The tools, Claude
+# Code, the Claude config, the login and the work folder all stay.
+export def --env remove-session [] {
+  if (is-windows) {
+    let file = startup-file
+    if (windows-session-running) {
+      change "stop the session" {
+        powershell 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match "session\.nu" } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }'
+      }
+    } else {
+      ok "session is not running"
+    }
+    if ($file | path exists) {
+      change $"remove the sign-in entry \(($file))" { rm $file }
+    } else {
+      ok "no sign-in entry"
+    }
+    return
+  }
+  if (have pitchfork) and (pitchfork-session-running) {
+    change "stop the session" { ^pitchfork stop $DAEMON | complete | ignore }
+  } else {
+    ok "session is not running"
+  }
+  let file = $nu.home-dir | path join .config pitchfork config.toml
+  let config = if ($file | path exists) { open $file } else { {} }
+  if ($config | get --optional daemons | default {} | get --optional $DAEMON) == null {
+    ok "no session service in pitchfork's config"
+  } else {
+    change $"remove the session service from ($file)" {
+      $config | update daemons {|it| $it.daemons | reject $DAEMON } | to toml | save --force $file
+    }
+  }
+}
