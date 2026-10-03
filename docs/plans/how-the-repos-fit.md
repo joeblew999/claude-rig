@@ -57,7 +57,11 @@ Each layer calls the one below through a small, stable seam: claude-rig asks the
 - For: the larger, more mature codebase becomes the home.
 - Against: the rig runs on machines that are not VMs (the office PC, any Linux box); it would live under a VM tool's name and Mac-only conventions.
 
-## Decisions for the owner
+## Decided
+
+Option A, on 3 Oct 2026 (the owner: "you pick everything"). The decisions and what follows from them are in [Control plane](control-plane.md#decided-owner-3-oct-2026-you-pick-everything).
+
+## The decisions that were needed
 
 1. **A, B or C.** Recommended: A.
 2. **The VM tool's name.** It makes Windows and Linux VMs now. Keep `irgo-windows-vm` / `irgo-winvm`, or rename. Renaming the GitHub repo keeps redirects for old links; the Homebrew tap and the install URL would change. If A, a short neutral name for "VMs on a Mac" fits; the owner's naming, not the lead's.
