@@ -49,7 +49,7 @@ For seeing a login run out before it does. fleet-api keeps fields it does not kn
 
 | Field | From |
 |---|---|
-| `status`, `why` | `ok` when `claude auth status` answered; `unknown` and why when it did not |
+| `status`, `why` | `ok` when `claude auth status` answered; `unknown` and why when it did not. The two `refresh_expires` fields are there either way |
 | `logged_in`, `auth_method` | `claude auth status`: `loggedIn` and `authMethod` only |
 | `refresh_expires` | When the refresh token expires, Unix milliseconds: `claudeAiOauth.refreshTokenExpiresAt` of Claude's stored login, `~/.claude/.credentials.json` on Linux and Windows, the keychain item `Claude Code-credentials` on macOS (the file wins when it is there) |
 | `refresh_expires_why` | Instead of `refresh_expires`, when it cannot be read |
