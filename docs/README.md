@@ -50,6 +50,6 @@ Never edit these: change the source and run the task.
 | [Guides](guides.md) | [Rig a Windows PC](guides/windows.md), [Rig a machine over SSH](guides/push.md), [Make a VM worker](guides/vm.md), [See and steer the fleet](guides/fleet.md), [Change the config everywhere](guides/capture.md), [Take a machine out](guides/unrig.md) |
 | [Concepts](concepts.md) | [A run](concepts/a-run.md), [Login and the session](concepts/login-and-session.md), [Your config](concepts/config.md) |
 | [Reference](reference.md) | [Tasks](reference/tasks.md), [Settings](reference/settings.md), [What the rig writes on a machine](reference/files.md) |
-| [This repository](contributing.md) | [Rules](rules.md), [Findings](findings.md), [Plans](plans.md) ([Backlog](plans/backlog.md), [How the repos fit](plans/how-the-repos-fit.md)), [Writing docs](writing.md) |
+| [This repository](contributing.md) | [Rules](rules.md), [Findings](findings.md), [Plans](plans.md) ([Backlog](plans/backlog.md), [How the repos fit](plans/how-the-repos-fit.md), [Adoption](plans/adoption.md)), [Writing docs](writing.md) |
 
 For an agent: [llms.txt](https://joeblew999.github.io/claude-rig/llms.txt) lists every page as Markdown.
