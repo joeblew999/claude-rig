@@ -57,7 +57,7 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 | Release the UTM repo | Done: `v0.6.0`, with the two changes above |
 | A command that runs a shell command in the guest and returns the output | `utmctl exec` returns neither output nor exit code. `app-create` does, but only for an `.exe` |
 | Linux VMs | Phase 1 is merged there: `irgo-winvm vm-create -os linux -vm <name> -install` makes an Ubuntu 24.04 ARM64 VM from Ubuntu's own cloud image in about a minute, and `vm-ssh-create` turns SSH on in 3 s. No R2 cache is needed for Linux. The rig's Linux test machine is now that: the UTM VM `claude-rig-linux`, rigged with `push` (dry run, real run, second run with no changes). The OrbStack VM is deleted. Later phases there: a Linux golden image and clones, running a Linux program in the guest, sealing OpenSSH into the Windows golden image |
-| The UTM tool's name | With Linux in it, "irgo-windows-vm" no longer fits. Needs the owner: keep it, rename the binary, rename the repo, or decide it together with how the two repos fit |
+| How the repos fit together, and the UTM tool's name | A proposal is written: [2026-10-03-01-how-the-repos-fit.md](2026-10-03-01-how-the-repos-fit.md). Recommended: two products split by layer (provision, rig, control plane), the VM tool renamed, the glaze suite moved into Irgo. Needs the owner to pick |
 | Run the rig before sealing the golden image | Plan step 6: every clone then starts as a rigged machine, and only needs its login |
 | Releases | The owner wants releases pushed for both repos, when the lead judges them ready |
 
