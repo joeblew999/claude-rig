@@ -3,6 +3,8 @@ nu = "0.116.0"
 shellcheck = "latest"
 # charter writes and checks the docs site the same way in every repo of the owner's.
 "github:joeblew999/charter" = "0.9.0"
+# The VM tool: makes the UTM VMs that `mise run vm` enrols (macOS only).
+"github:joeblew999/irgo-windows-vm" = { version = "0.7.0", os = ["macos"], asset_pattern = "irgo-winvm-darwin-arm64", bin = "irgo-winvm" }
 
 [tasks.rig]
 description = "Rig this machine: tools, Claude Code, Claude config. Pass --dry-run to only look."
@@ -15,6 +17,10 @@ run = "nu tasks/doctor.nu"
 [tasks.fleet]
 description = "Every rigged machine in one table: this one and each machine rigged from here with push."
 run = "nu tasks/fleet.nu"
+
+[tasks.vm]
+description = "A UTM VM on this Mac, made and rigged in one step: mise run vm -- new linux <name>, or rm <name>"
+run = "nu tasks/vm.nu"
 
 [tasks.unrig]
 description = "Take this machine out of the fleet: stop the always-on session. Pass --dry-run to only look."

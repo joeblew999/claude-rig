@@ -14,6 +14,7 @@ Run as `mise run <task>`; flags go after `--` (`mise run doctor -- --json`).
 | `doctor` | `--json` | A report on this machine, then what a run would change. `--json`: the report alone |
 | `push` | `<user@host>`, `--dry-run`, `--ref`, `--port`, `--identity`, `--known-hosts` | Rigs another machine over SSH ([guide](../guides/push.md)) |
 | `fleet` | `--json`; `add <user@host> [--windows --port --identity]`; `forget <user@host>`; `run <machine> "<work>"` or `run --all "<work>"` | Every rigged machine in one table, and giving them work ([guide](../guides/fleet.md)) |
+| `vm` | `new <linux\|windows> <name> [--ref]`, `rm <name>` | Makes a UTM VM on this Mac, turns SSH on and rigs it; or deletes it ([guide](../guides/vm.md)) |
 | `unrig` | `--dry-run` | Stops the session and removes what starts it ([guide](../guides/unrig.md)) |
 | `capture` | | Copies your Mac's `~/.claude` into `claude/` ([guide](../guides/capture.md)) |
 | `apply` | `--dry-run` | The config step of a run on its own |
