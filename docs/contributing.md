@@ -17,4 +17,8 @@ CI (`.github/workflows/test.yml`) runs the bootstrap on fresh macOS, Ubuntu x64 
 
 A release is a version tag on a commit whose CI passed, with notes saying where it was tested: [releases](https://github.com/joeblew999/claude-rig/releases).
 
+## Report a bug or ask for something
+
+Use the GitHub issue forms. An agent prints the same form with `mise x -- charter issue bug > body.md` (or `feature`, `upstream`); its first line is the `gh` command that files it. Labels come from `.github/labels.tsv` (`mise x -- charter labels` applies them to GitHub).
+
 [The rules](rules.md) are binding.

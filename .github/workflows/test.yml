@@ -69,6 +69,7 @@ jobs:
           nu tests/apply.nu
           nu tests/capture.nu
           nu tests/config.nu
+          nu tests/claims.nu
           nu tests/report.nu
 
       - name: Doctor reports this machine
@@ -135,6 +136,8 @@ jobs:
           nu tests\capture.nu
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
           nu tests\config.nu
+          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
+          nu tests\claims.nu
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
           nu tests\report.nu
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
