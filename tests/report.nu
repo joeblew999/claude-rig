@@ -3,13 +3,16 @@
 #
 # Each test runs the real task against a throwaway rig folder
 # (RIG_CONFIG_HOME): the report built from a made-up `doctor --json` holds
-# to fleet-api's schema, the machine id stays the same, a report that cannot
-# be delivered is spooled, and with no token nothing is posted. Nothing here
-# reaches fleet-api: the one URL used is a closed port on this machine.
+# to fleet-api's schema, as fleet-api's generated SDK checks it (through
+# tasks/fleet-api.ts, so bun and the SDK the tool list installs are needed),
+# names no person or network, the machine id stays the same, a report that
+# cannot be delivered is spooled, with no token nothing is posted, and the VM
+# keeper's list is taken while fresh. Nothing here reaches fleet-api: the one
+# URL used is a closed port on this machine.
 #
 #   nu tests/report.nu
 
-use ../tasks/report.nu [TOKEN_UNIX_COMMAND auth-from]
+use ../tasks/report.nu [TOKEN_UNIX_COMMAND auth-from fleet-api]
 use ../tasks/awake.nu [awake-plan run-windows-keeper keeper-state]
 
 const REPORT = path self ../tasks/report.nu
@@ -31,122 +34,26 @@ def run-report [rig_home: path, args: list<string>, --token: string = "", --url:
   }
 }
 
-# --- fleet-api's rules, as api/device.go in fleet-api says them -----------
-
 def is-int [value: any]: nothing -> bool { ($value | describe) == "int" }
 
-# Every rule a report breaks, as "where: what". Empty when it holds.
-export def schema-errors [report: record]: nothing -> list<string> {
-  mut bad = []
-  let watching = $report.reason? in [start change interval]
-  if $report.schema? != 1 { $bad = $bad | append "schema: not 1" }
-  if ($report.id? | default "") !~ '^[0-9a-f]{16}$' { $bad = $bad | append "id: not 16 hex digits" }
-  if not (is-int $report.ts?) or ($report.ts? | default 0) < 1 { $bad = $bad | append "ts: not Unix milliseconds" }
-  if $report.reason? not-in [start change interval stop once] { $bad = $bad | append "reason: unknown" }
-  let next = $report.next_s? | default (-1)
-  if not (is-int $next) or $next < 0 or $next > 86400 { $bad = $bad | append "next_s: out of range" }
-  if $watching and $next == 0 { $bad = $bad | append "next_s: a watcher promises its next report" }
-  if not $watching and $next != 0 { $bad = $bad | append "next_s: stop and once promise nothing" }
-  for field in [version command] {
-    if ($report.tool? | default {} | get --optional $field | default "") == "" { $bad = $bad | append $"tool.($field): missing" }
-  }
-  let host = $report.host? | default {}
-  if ($host.name? | default "") == "" { $bad = $bad | append "host.name: missing" }
-  if $host.os? not-in [darwin linux windows] { $bad = $bad | append "host.os: not darwin, linux or windows" }
-  if ($host.arch? | default "") == "" { $bad = $bad | append "host.arch: missing" }
-  if "boot" in $host and not (is-int $host.boot) { $bad = $bad | append "host.boot: not an integer" }
+# Why fleet-api's schema refuses a report, as its generated SDK checks it; ""
+# when it holds.
+def refused [report: record]: nothing -> string {
+  let answer = fleet-api check --input ($report | to json --raw)
+  if $answer.ok { "" } else { $answer.why }
+}
 
-  # A section: its status, why only when unknown, and the values it must
-  # (need) or may (only) carry when ok and must not carry otherwise.
-  let section = {|path, value, statuses, need, only, ints|
-    mut errors = []
-    let status = $value.status? | default ""
-    if $status not-in $statuses { $errors = $errors | append $"($path).status: ($status) is not one of ($statuses | str join ', ')" }
-    if $status == "unknown" and ($value.why? | default "") == "" { $errors = $errors | append $"($path).why: unknown needs a reason" }
-    if $status == "ok" and ($value.why? | default "") != "" { $errors = $errors | append $"($path).why: ok has no reason" }
-    for field in $need {
-      let present = ($value | get --optional $field) != null
-      if $status == "ok" and not $present { $errors = $errors | append $"($path).($field): missing though ok" }
-      if $status != "ok" and $present { $errors = $errors | append $"($path).($field): present though not ok" }
-    }
-    for field in $only {
-      if $status != "ok" and ($value | get --optional $field) != null { $errors = $errors | append $"($path).($field): present though not ok" }
-    }
-    for field in $ints {
-      let found = $value | get --optional $field
-      if $found != null and not (is-int $found) { $errors = $errors | append $"($path).($field): not an integer" }
-      if $found != null and (is-int $found) and $found < 0 { $errors = $errors | append $"($path).($field): negative" }
-    }
-    $errors
-  }
-
-  $bad = $bad ++ (do $section cpu ($report.cpu? | default {}) [ok unknown] [count] [load1] [count])
-  let memory = $report.memory? | default {}
-  $bad = $bad ++ (do $section memory $memory [ok unknown] [total available] [] [total available])
-  if ($memory.available? | default 0) > ($memory.total? | default 0) { $bad = $bad | append "memory.available: more than total" }
-
-  let disks = $report.disks? | default []
-  if ($disks | is-empty) or ($disks | length) > 8 { $bad = $bad | append "disks: 1 to 8 entries" }
-  let roles = $disks | each {|disk| $disk.roles? | default [] } | flatten
-  if ($roles | sort) != ([system data] | sort) { $bad = $bad | append $"disks: roles are ($roles | str join ', '), not system and data once each" }
-  for disk in ($disks | enumerate) {
-    let path = $"disks[($disk.index)]"
-    $bad = $bad ++ (do $section $path $disk.item [ok unknown] [total free] [fs] [total free])
-    if ($disk.item.path? | default "") == "" { $bad = $bad | append $"($path).path: missing" }
-    if ($disk.item.free? | default 0) > ($disk.item.total? | default 0) { $bad = $bad | append $"($path).free: more than total" }
-  }
-
-  let power = $report.power? | default {}
-  $bad = $bad ++ (do $section power $power [ok unknown] [source] [] [])
-  if "source" in $power and $power.source not-in [ac battery ups] { $bad = $bad | append "power.source: unknown" }
-
-  let battery = $report.battery? | default {}
-  $bad = $bad ++ (do $section battery $battery [ok none unknown] [count percent state] [health remaining_s] [count remaining_s])
-  if "percent" in $battery and ($battery.percent < 0 or $battery.percent > 100) { $bad = $bad | append "battery.percent: outside 0 to 100" }
-  if "state" in $battery and $battery.state not-in [charging discharging full idle] { $bad = $bad | append "battery.state: unknown" }
-  if $battery.status? == "none" and $power.source? == "battery" { $bad = $bad | append "power.source: battery, with no battery" }
-
-  let lid = $report.lid? | default {}
-  $bad = $bad ++ (do $section lid $lid [ok none unknown] [closed] [] [])
-
-  let sleep = $report.sleep? | default {}
-  $bad = $bad ++ (do $section sleep $sleep [ok none unknown] [idle_s inhibited] [display_s lid_action inhibitors] [idle_s display_s])
-  if $sleep.status? == "ok" and $lid.status? == "ok" and ($sleep.lid_action? | default "") == "" { $bad = $bad | append "sleep.lid_action: missing though there is a lid" }
-  if "lid_action" in $sleep and $sleep.lid_action not-in [sleep hibernate shutdown lock nothing] { $bad = $bad | append "sleep.lid_action: unknown" }
-  if ($sleep.inhibited? == false) and ($sleep.inhibitors? | default [] | is-not-empty) { $bad = $bad | append "sleep.inhibitors: listed though nothing inhibits" }
-  if ($sleep.inhibitors? | default [] | length) > 8 { $bad = $bad | append "sleep.inhibitors: more than 8" }
-
-  let keeper = $report.keeper? | default {}
-  $bad = $bad ++ (do $section keeper $keeper [ok none unknown] [running idle lid] [] [])
-  if $keeper.running? == false and ($keeper.idle? == true or $keeper.lid? == true) { $bad = $bad | append "keeper: holding something though it is not running" }
-
-  if "rig" in $report {
-    $bad = $bad ++ (do $section rig $report.rig [ok none unknown] [tools_installed config_applied logged_in session_running] [commit claude_version work_dir] [])
-  }
-  if "claims" in $report {
-    let claims = $report.claims
-    $bad = $bad ++ (do $section claims $claims [ok none unknown] [slots] [held] [slots])
-    let held = $claims.held? | default []
-    if ($claims.slots? | default 64) < ($held | length) { $bad = $bad | append "claims.held: more claims than slots" }
-    for claim in ($held | enumerate) {
-      let path = $"claims.held[($claim.index)]"
-      if ($claim.item.id? | default "") !~ '^[A-Za-z0-9._-]{1,64}$' { $bad = $bad | append $"($path).id: not a claim id" }
-      if ($claim.item.caller? | default "") == "" or ($claim.item.job? | default "") == "" { $bad = $bad | append $"($path): caller and job are needed" }
-      if not (is-int $claim.item.since?) { $bad = $bad | append $"($path).since: not Unix milliseconds" }
-      if "until" in $claim.item and ($claim.item.until < $claim.item.since) { $bad = $bad | append $"($path).until: before since" }
-    }
-  }
-
-  # Nothing that names a person or a network, and no string over 200 bytes.
+# Everything in a report that names a person or a network. Empty when it
+# names none.
+export def privacy-errors [report: record]: nothing -> list<string> {
   let strings = $report | to json --raw | parse --regex '"(?<text>(?:[^"\\]|\\.)*)"' | get text
+  mut bad = []
   for text in $strings {
     if ($text | str contains "@") { $bad = $bad | append $"a string has an @: ($text)" }
     if $text =~ '(^|[^0-9.])\d{1,3}(\.\d{1,3}){3}($|[^0-9.])' { $bad = $bad | append $"a string has an IP address: ($text)" }
     if $text =~ '(?i)^([a-z]:)?[/\\]+(users|home)[/\\]+[^/\\]+' and $text !~ '(?i)^([a-z]:)?[/\\]+users[/\\]+shared' { $bad = $bad | append $"a string names a home folder: ($text)" }
     if $text =~ '([0-9a-f]{2}[:-]){5}[0-9a-f]{2}' { $bad = $bad | append $"a string has a MAC address: ($text)" }
-    if ($text | str length) > 200 { $bad = $bad | append "a string is over 200 bytes" }
   }
-  if ($report | to json --raw | str length) > 16384 { $bad = $bad | append "over 16 KiB" }
   $bad
 }
 
@@ -158,9 +65,12 @@ def test-shape [root: path] {
   let run = run-report $rig_home [--print --doctor $FIXTURE]
   check "report --print succeeds" ($run.exit_code == 0)
   let report = $run.stdout | from json
-  let errors = schema-errors $report
-  if ($errors | is-not-empty) { print ($errors | each {|error| $"        ($error)" } | str join "\n") }
-  check "it holds to fleet-api's schema" ($errors | is-empty)
+  let why = refused $report
+  if $why != "" { print $"        ($why)" }
+  check "it holds to fleet-api's schema, as its SDK checks it" ($why == "")
+  let named = privacy-errors $report
+  if ($named | is-not-empty) { print ($named | each {|error| $"        ($error)" } | str join "\n") }
+  check "it names no person or network" ($named | is-empty)
   check "reason once promises no next report" ($report.reason == "once" and $report.next_s == 0)
   check "the rig section is doctor's" ($report.rig.status == "ok" and $report.rig.logged_in and not $report.rig.session_running and $report.rig.commit == "4fd9d8e")
   check "the work folder is written with ~" ($report.rig.work_dir == "~/work")
@@ -172,10 +82,12 @@ def test-shape [root: path] {
   # This machine's own report too, whatever it runs on.
   let start = run-report $rig_home [--print --doctor $FIXTURE --reason start]
   let started = $start.stdout | from json
-  check "a start report holds to the schema and promises the next in 300 s" ((schema-errors $started | is-empty) and $started.next_s == 300)
+  check "a start report holds to the schema and promises the next in 300 s" ((refused $started) == "" and $started.next_s == 300)
+  let checked = run-report $rig_home [--check --doctor $FIXTURE]
+  check "report --check says it holds" ($checked.exit_code == 0 and $checked.stdout =~ "holds to fleet-api's schema")
 
-  let broken = $report | upsert next_s 300 | upsert rig.work_dir "/home/dev/work"
-  check "the checks catch a report that breaks the rules" ((schema-errors $broken | length) >= 2)
+  check "the SDK refuses a report that breaks the schema" ((refused ($report | upsert reason "whenever" | reject host)) =~ 'reason.*host')
+  check "the privacy check catches a home folder and an address" ((privacy-errors ($report | upsert rig.work_dir "/home/dev/work" | upsert host.name "dev@box") | length) == 2)
 }
 
 def test-device-id [root: path] {
@@ -201,7 +113,7 @@ def test-spool [root: path] {
   let again = run-report $rig_home [--doctor $FIXTURE --reason interval] --token "test-token"
   check "the next one is spooled beside it" ($again.stdout =~ 'spooled' and (ls $spool | length) == 2)
   let kept = ls $spool | get name | sort | each {|file| open --raw $file | decode utf-8 | from json }
-  check "both are whole reports, oldest first" ($kept.0.reason == "once" and $kept.1.reason == "interval" and ($kept | all {|report| schema-errors $report | is-empty }))
+  check "both are whole reports, oldest first" ($kept.0.reason == "once" and $kept.1.reason == "interval" and ($kept | all {|report| (refused $report) == "" }))
   check "the token is in none of them" ($kept | all {|report| not ($report | to json | str contains "test-token") })
 }
 
@@ -299,7 +211,7 @@ def test-login [root: path] {
   check "no token, or its name, is in the report" ($leaked | is-empty)
   check "it has the refresh token's expiry, in Unix milliseconds" ($login.refresh_expires? == 1792989310012)
   check "nor the email or the organisation" (not ($result.stdout =~ '(?i)someone@example|0b9c1d2e|Example Org|"email"|"org'))
-  check "the report still holds to the schema" (schema-errors ($result.stdout | from json) | is-empty)
+  check "the report still holds to the schema" ((refused ($result.stdout | from json)) == "")
 
   let bare = $root | path join login-bare
   mkdir $bare
@@ -352,6 +264,25 @@ def test-awake [] {
   try { job kill $held }
 }
 
+def test-vms [root: path] {
+  print "the VMs, as the VM keeper writes them"
+  let rig_home = $root | path join vms
+  let report = {|| run-report $rig_home [--print --doctor $FIXTURE] | get stdout | from json }
+  check "with no keeper's file there is no vms section" ("vms" not-in (do $report))
+  mkdir $rig_home
+  let now = (date now | into int) // 1_000_000
+  let vms = {status: "ok", manager: "utm", manager_running: true, list: [{name: "claude-rig-linux", state: "started", os: "linux", owner: "claude-rig", keep_running: true, keeper_starts: 1}]}
+  {ts: $now, vms: $vms} | to json | save --force ($rig_home | path join vms.json)
+  let fresh = do $report
+  check "a fresh list is the vms section, as written" ($fresh.vms == $vms)
+  check "and the report holds to the schema" ((refused $fresh) == "")
+  {ts: ($now - 600_000), vms: $vms} | to json | save --force ($rig_home | path join vms.json)
+  let stale = do $report | get vms
+  check "a stale list is unknown, and says how old" ($stale.status == "unknown" and $stale.why =~ '10 min ago' and "list" not-in $stale)
+  "not json" | save --force ($rig_home | path join vms.json)
+  check "a broken file is unknown, and says why" ((do $report | get vms.status) == "unknown")
+}
+
 def main [] {
   let root = mktemp --directory | path expand
   try {
@@ -361,6 +292,7 @@ def main [] {
     test-no-token $root
     test-token-file $root
     test-login $root
+    test-vms $root
     test-awake
   } catch {|failure|
     rm --recursive --force $root

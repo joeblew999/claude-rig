@@ -20,3 +20,6 @@ ripgrep = "15.2.0"
 shellcheck = "0.11.0"
 usage = "6.12.0"
 yq = "4.53.6"
+# fleet-api's generated TypeScript SDK (sources; one archive for every OS), from fleet-api's
+# release: what tasks/fleet-api.ts runs with bun to post a report and list the fleet.
+"github:joeblew999/fleet-api" = { version = "0.1.0", asset_pattern = "fleet-api-sdk-typescript.tar.gz" }
