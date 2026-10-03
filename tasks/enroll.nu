@@ -79,18 +79,18 @@ def session-script []: nothing -> path {
 }
 
 # What pitchfork should run: this machine's session, restarted if it stops,
-# started again after a reboot. It is stopped with SIGINT rather than
-# SIGTERM: nushell lets a script go on after SIGINT, so the session can send
-# its `stop` report before it ends.
+# started again after a reboot. When pitchfork stops it, its on_stop hook
+# sends the `stop` report: the session itself is gone by then.
 def daemon-wanted []: nothing -> record {
   let script = session-script
+  let report = $script | path dirname | path join report.nu
   {
     run: $"\"($nu.current-exe)\" \"($script)\""
     dir: (work-dir)
     boot_start: true
     retry: true
     ready_output: "Connected"
-    stop_signal: {signal: "SIGINT", timeout: "30s"}
+    hooks: {on_stop: $"\"($nu.current-exe)\" \"($report)\" --reason stop"}
   }
 }
 

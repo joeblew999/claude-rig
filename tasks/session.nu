@@ -10,7 +10,8 @@
 #
 # While it runs it keeps the machine awake (awake.nu) and reports to
 # fleet-api (report.nu): `start` when it starts, `interval` every 5 minutes,
-# `stop` when it ends. A report that fails never stops the session.
+# `stop` when the server ends (or, when pitchfork stops it, pitchfork's
+# on_stop hook does). A report that fails never stops the session.
 #
 #   nu tasks/session.nu [--keep-alive]
 
@@ -40,8 +41,10 @@ def report [reason: string] {
 }
 
 # Report `start`, then `interval` every EVERY_S seconds, until killed. Run
-# in a job, beside the server.
+# in a job, beside the server. `start` waits a little, so that on a restart
+# the `stop` from pitchfork's hook is the older of the two.
 def reporter [] {
+  sleep 10sec
   report start
   loop {
     sleep ($EVERY_S * 1sec)
@@ -63,8 +66,9 @@ def main [
   let reporting = job spawn { reporter }
 
   if not $keep_alive {
-    # pitchfork stops the session with SIGINT (enroll.nu), which ends the
-    # server and the reporter but lets this go on to report `stop`.
+    # When pitchfork stops the session, this process ends with it, and
+    # pitchfork's on_stop hook reports `stop` (enroll.nu). When the server
+    # ends by itself, the session reports it here.
     let failed = try { serve $awake.prefix; false } catch { true }
     try { job kill $reporting }
     report stop

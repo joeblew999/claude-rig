@@ -18,5 +18,8 @@ parent: Reference
 | `CLAUDE_HOME` | `~/.claude` | The Claude config folder the tasks read and write |
 | `RIG_MACHINES` | `~/.config/claude-rig/machines.json` | The machine list `push` and `fleet` use |
 | `RIG_ASSUME_LOGGED_IN` | unset | `1` skips the login step and runs the session step anyway. For CI only |
+| `FLEET_API_WRITE_TOKEN` | unset | fleet-api's write token. `push` sends it to the machine; a run keeps it in `~/.config/claude-rig/fleet-api.token`; `report` posts with it, before the file. Unset everywhere: reporting is skipped ([Reporting](../concepts/reporting.md#the-write-token)) |
+| `FLEET_API_READ_TOKEN` | unset | fleet-api's read token, for `report -- --list`. Unset: the write token is used |
+| `FLEET_API_URL` | `https://fleet-api.gedw99.workers.dev` | Where reports go (the tests point it at a closed port) |
 
 mise's own `MISE_CONFIG_DIR`, `MISE_DATA_DIR`, `XDG_CONFIG_HOME` and `XDG_DATA_HOME` are respected for where the tool list and the shims go.

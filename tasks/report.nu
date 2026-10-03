@@ -379,7 +379,10 @@ def sleep-section [lid: record]: nothing -> record {
 # This machine's doctor report, or null with why it could not be had.
 def doctor-facts []: nothing -> record {
   let script = $HERE | path join doctor.nu
-  let result = ^$nu.current-exe $script --json | complete
+  # A service starts with almost nothing on PATH, and doctor looks for mise
+  # on it: add where Homebrew puts it, as a shell on a Mac would have it.
+  let path = if $nu.os-info.name == "macos" { $env.PATH ++ [/opt/homebrew/bin /usr/local/bin] } else { $env.PATH }
+  let result = with-env {PATH: $path} { ^$nu.current-exe $script --json | complete }
   if $result.exit_code != 0 { return {facts: null, why: "doctor --json failed"} }
   try { {facts: ($result.stdout | from json), why: ""} } catch { {facts: null, why: "doctor --json printed no JSON"} }
 }
@@ -442,6 +445,9 @@ export def build-report [reason: string, --doctor: any, --command: string = "rep
     keeper: (keeper-state)
     rig: (rig-section $facts $from.why)
   }
+  # A stop report is sent as the session ends, whatever the process list
+  # still shows.
+  let report = if $reason == "stop" and $report.rig.status == "ok" { $report | upsert rig.session_running false } else { $report }
   let claims = claims-section $facts
   if $claims == null { $report } else { $report | insert claims $claims }
 }
