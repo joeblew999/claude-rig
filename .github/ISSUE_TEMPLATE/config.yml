@@ -1,0 +1,4 @@
+# Adapted from charter's issue forms (cmd/charter/github/ in joeblew999/charter), so issues here have the same shape.
+# A blank issue skips every required field, so the web offers only the forms. gh and the API ignore
+# forms: `charter issue <kind>` prints the same headings as a body for them.
+blank_issues_enabled: false
