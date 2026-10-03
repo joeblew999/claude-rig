@@ -58,7 +58,7 @@ With `--all`, a busy machine is reported as busy and not waited for. A claim who
 
 ## Let Claude do it
 
-Every rigged machine has the skill `claude-rig-fleet` (in `claude/skills/`), so Claude knows these commands. The [plugin](plugin.md) brings the same skill, and the commands `/rig:fleet` and `/rig:work`. Ask a Claude session on your Mac, in the app or a terminal, something like "run the test suite on the Windows and Linux machines and tell me what differs", and it splits the job, gives each machine its piece with `fleet run`, and checks the answers before it reports.
+The [plugin](plugin.md) brings the skill `claude-rig-fleet`, so Claude knows these commands, and the commands `/rig:fleet` and `/rig:work`. Ask a Claude session on your Mac, in the app or a terminal, something like "run the test suite on the Windows and Linux machines and tell me what differs", and it splits the job, gives each machine its piece with `fleet run`, and checks the answers before it reports.
 
 ## Limits
 

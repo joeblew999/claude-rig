@@ -41,24 +41,34 @@ jobs:
           test ! -e "$HOME/.config/mise/conf.d/claude-rig.toml"
           test ! -e "$HOME/.claude/.rig-manifest"
 
-      - name: First run
-        run: sh bootstrap.sh
+      # The runner has no config, so this is a run with none chosen.
+      - name: First run, with no config
+        run: |
+          sh bootstrap.sh | tee first-run.log
+          grep -E '^ +skip +config: none chosen' first-run.log
+          test ! -e "$HOME/.claude/.rig-manifest"
 
-      - name: Tools and config are in place
+      - name: Tools are in place
         run: |
           export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
           claude --version
           for tool in gh jq yq rg fd node go bun nu fnox pitchfork; do
             command -v "$tool"
           done
-          jq -e '.remoteControlAtStartup == true' "$HOME/.claude/settings.json"
-          test -f "$HOME/.claude/skills/mise-tasks/SKILL.md"
+
+      # A made-up config from the tests, given the way a user gives theirs.
+      - name: A run with a config
+        run: |
+          RIG_CONFIG="$PWD/tests/fixtures/config" sh bootstrap.sh
+          jq -e '.remoteControlAtStartup == true and .model == "opus"' "$HOME/.claude/settings.json"
+          test -f "$HOME/.claude/skills/alpha/SKILL.md"
 
       - name: Tests
         run: |
           export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
           nu tests/apply.nu
           nu tests/capture.nu
+          nu tests/config.nu
           nu tests/claims.nu
 
       - name: Doctor reports this machine
@@ -69,7 +79,7 @@ jobs:
 
       - name: Second run changes nothing
         run: |
-          sh bootstrap.sh | tee second-run.log
+          RIG_CONFIG="$PWD/tests/fixtures/config" sh bootstrap.sh | tee second-run.log
           if grep -E '^ +(change|would) ' second-run.log; then
             echo "The second run made changes." >&2
             exit 1
@@ -93,19 +103,29 @@ jobs:
           if (Test-Path "$HOME\.config\mise\conf.d\claude-rig.toml") { throw 'the dry run installed the tool list' }
           if (Test-Path "$HOME\.claude\.rig-manifest") { throw 'the dry run applied the config' }
 
-      - name: First run
-        run: .\bootstrap.ps1
+      # The runner has no config, so this is a run with none chosen.
+      - name: First run, with no config
+        run: |
+          .\bootstrap.ps1 | Tee-Object first-run.log
+          if (-not (Select-String -Path first-run.log -Pattern '^ +skip +config: none chosen')) { throw 'the config step was not skipped' }
+          if (Test-Path "$HOME\.claude\.rig-manifest") { throw 'a config was applied' }
 
-      - name: Tools and config are in place
+      - name: Tools are in place
         run: |
           $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
           claude --version
           foreach ($tool in 'gh', 'jq', 'yq', 'rg', 'fd', 'node', 'go', 'bun', 'nu', 'fnox', 'pitchfork') {
             (Get-Command $tool).Source
           }
+
+      # A made-up config from the tests, given the way a user gives theirs.
+      - name: A run with a config
+        run: |
+          $env:RIG_CONFIG = "$PWD\tests\fixtures\config"
+          .\bootstrap.ps1
           $settings = Get-Content "$HOME\.claude\settings.json" -Raw | ConvertFrom-Json
           if (-not $settings.remoteControlAtStartup) { throw 'remote control is not on' }
-          if (-not (Test-Path "$HOME\.claude\skills\mise-tasks\SKILL.md")) { throw 'skills are missing' }
+          if (-not (Test-Path "$HOME\.claude\skills\alpha\SKILL.md")) { throw 'skills are missing' }
 
       - name: Tests
         run: |
@@ -113,6 +133,8 @@ jobs:
           nu tests\apply.nu
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
           nu tests\capture.nu
+          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
+          nu tests\config.nu
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
           nu tests\claims.nu
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
@@ -128,6 +150,7 @@ jobs:
 
       - name: Second run changes nothing
         run: |
+          $env:RIG_CONFIG = "$PWD\tests\fixtures\config"
           .\bootstrap.ps1 | Tee-Object second-run.log
           if (Select-String -Path second-run.log -Pattern '^ +(change|would) ') {
             throw 'The second run made changes.'
@@ -138,6 +161,7 @@ jobs:
       - name: Session starts at sign-in and stays up
         env:
           RIG_ASSUME_LOGGED_IN: "1"
+          RIG_CONFIG: tests\fixtures\config
         run: |
           .\bootstrap.ps1
           $startup = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\claude-rig.cmd"
@@ -169,6 +193,9 @@ jobs:
     env:
       # Rig from the branch under test, not from main.
       RIG_TEST_REF: ${{ github.head_ref || github.ref_name }}
+      # The config push sends: the tests' made-up one. The SSH session on the
+      # other end does not get this variable, so it takes in what was sent.
+      RIG_CONFIG: ${{ github.workspace }}\tests\fixtures\config
     steps:
       - uses: actions/checkout@v4
 
@@ -231,6 +258,7 @@ jobs:
           if (Test-Path "$HOME\.claude-rig") { throw 'the dry run left a clone of the rig' }
           if (Test-Path "$HOME\.config\mise\conf.d\claude-rig.toml") { throw 'the dry run installed the tool list' }
           if (Test-Path "$HOME\.claude\.rig-manifest") { throw 'the dry run applied the config' }
+          if (Test-Path "$HOME\.config\claude-rig\config.tar") { throw 'the dry run sent the config' }
           if (Test-Path "$HOME\.local\bin\claude.exe") { throw 'the dry run installed Claude Code' }
 
       - name: First run over SSH
@@ -243,7 +271,8 @@ jobs:
           $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
           claude --version
           if ($LASTEXITCODE -ne 0) { throw 'claude does not run' }
-          if (-not (Test-Path "$HOME\.claude\settings.json")) { throw 'the Claude config is missing' }
+          if (-not (Test-Path "$HOME\.claude\skills\alpha\SKILL.md")) { throw 'the config push sent is missing' }
+          if (Test-Path "$HOME\.config\claude-rig\config.tar") { throw 'the sent config was not taken in' }
 
       - name: Second run over SSH changes nothing
         run: |

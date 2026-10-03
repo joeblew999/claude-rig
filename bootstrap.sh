@@ -4,6 +4,10 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.sh | sh
 #   curl -fsSL .../bootstrap.sh | sh -s -- --dry-run
+#   curl -fsSL .../bootstrap.sh | RIG_CONFIG=<git URL or folder> sh
+#
+# RIG_CONFIG is your Claude config: a git URL (cloned to ~/.config/claude-rig/config)
+# or a folder. Without one the config step is skipped and everything else runs.
 #
 # Safe to repeat. Each step checks first and acts only if something is missing.
 # With --dry-run it changes nothing and reports what a real run would do.

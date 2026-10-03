@@ -20,6 +20,7 @@
 # Exit codes: 0 done, 1 failed, 6 busy (every slot is held).
 
 use lib.nu *
+use userconfig.nu [rig-home]
 
 const BUSY = 6
 # A claim lives this long unless it is renewed; a running job renews it.
@@ -32,9 +33,9 @@ export def claims-dir []: nothing -> path {
   $env.RIG_CLAIMS? | default ($nu.home-dir | path join .local state claude-rig claims)
 }
 
-# The file that holds this machine's number of slots.
+# The file that holds this machine's number of slots, in the rig's config folder.
 def slots-file []: nothing -> path {
-  $nu.home-dir | path join .config claude-rig slots
+  rig-home | path join slots
 }
 
 # How many jobs this machine takes at once.

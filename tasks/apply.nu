@@ -1,6 +1,7 @@
 #!/usr/bin/env nu
-# apply.nu — apply claude/ from this repo to this machine's ~/.claude
+# apply.nu — apply the user's Claude config to this machine's ~/.claude
 #
+# Where the config comes from: userconfig.nu. With no config, nothing is done.
 # Safe to repeat. Merges rather than overwrites:
 #   - settings.json: rig keys are set, keys that exist only here are kept
 #   - skills, agents, commands, hooks: rig entries are added or updated,
@@ -11,6 +12,7 @@
 #   nu tasks/apply.nu [--dry-run]
 
 use lib.nu *
+use userconfig.nu [resolve-config settings-file]
 
 const DIRS = [skills agents commands hooks]
 
@@ -54,11 +56,14 @@ def main [
 ] {
   if $dry_run { $env.RIG_DRY_RUN = "1" }
 
-  let src = repo-dir | path join claude
+  let src = resolve-config
+  if $src == null {
+    skipped $"config: none chosen \(set RIG_CONFIG, choose a folder in (settings-file), or push from a machine that has one)"
+    print "apply: no config to apply."
+    return
+  }
   let dest = claude-home
   let manifest = $dest | path join ".rig-manifest"
-
-  if not ($src | path exists) { fail apply $"no captured config at ($src)" }
 
   # --- Backup, once ---------------------------------------------------------
 

@@ -23,7 +23,14 @@ def serve [] {
   # The first start on a machine asks "Enable Remote Control? (y/n)" once.
   # Rigging a machine is the owner saying yes, so answer it. On every later
   # start nothing is asked and the answer is ignored.
-  "y\n" | ^claude remote-control --name (machine-name)
+  # On macOS the session also keeps the Mac awake while it runs, on mains
+  # power only (caffeinate -s): a Mac that sleeps drops out of the Claude app
+  # and stops its VMs. Closing the lid still puts it to sleep.
+  if $nu.os-info.name == "macos" and (have caffeinate) {
+    "y\n" | ^caffeinate -i -s claude remote-control --name (machine-name)
+  } else {
+    "y\n" | ^claude remote-control --name (machine-name)
+  }
 }
 
 def main [

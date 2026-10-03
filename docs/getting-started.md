@@ -25,7 +25,13 @@ Every line says `ok` (already right), `would` (a real run changes this) or `skip
 curl -fsSL https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.sh | sh
 ```
 
-It installs git and mise if missing, the tools, Claude Code, and your config, then asks you to log in.
+It installs git and mise if missing, the tools and Claude Code, then asks you to log in. It sets up no Claude config: the config step says `skip`. To bring your own, a folder or a git repo laid out like `~/.claude`, name it in `RIG_CONFIG`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.sh | RIG_CONFIG=https://github.com/you/claude-config.git sh
+```
+
+How to make one, and where a run looks for it: [Your config](concepts/config.md).
 
 ## 3. Log in, once
 
@@ -49,5 +55,6 @@ Every line says `ok`. That is the rig's promise: running it again only fixes wha
 
 ## Next
 
+- Keep your config in one folder and send it to every machine: [Change the config everywhere](guides/capture.md).
 - Rig more machines from your Mac: [Rig a machine over SSH](guides/push.md), or make one: [Make a VM worker](guides/vm.md).
 - See them all and give them work: [See and steer the fleet](guides/fleet.md).

@@ -13,7 +13,7 @@ mise run push -- user@host --dry-run     # look: what a run there would change
 mise run push -- user@host               # rig it
 ```
 
-`push` works out the OS on the other end and runs the published bootstrap there. Run from a terminal, it passes the terminal through, so the login step on the machine can ask you for the code. When it succeeds, the machine is added to your machine list and shows in `mise run fleet`.
+`push` works out the OS on the other end, sends your config folder (`mise run config` shows which; with none, nothing is sent and the config step there is skipped), and runs the published bootstrap there. The config travels over the same SSH connection, so the machine needs no access to where you keep it ([Your config](../concepts/config.md#where-a-run-finds-it)). A dry run sends nothing. Run from a terminal, it passes the terminal through, so the login step on the machine can ask you for the code. When it succeeds, the machine is added to your machine list and shows in `mise run fleet`.
 
 | Flag | What it does |
 |---|---|

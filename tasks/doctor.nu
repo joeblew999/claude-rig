@@ -9,6 +9,7 @@
 
 use lib.nu *
 use enroll.nu [logged-in session-running]
+use userconfig.nu [describe-config]
 use claims.nu [live-claims slot-count]
 
 # The first line a program prints, or null if it is missing or fails.
@@ -35,6 +36,7 @@ def report []: nothing -> record {
     rig_commit: (rig-commit)
     tools_installed: $tools_ok
     claude_version: (first-line claude ["--version"])
+    config: (describe-config)
     config_applied: (claude-home | path join .rig-manifest | path exists)
     logged_in: (logged-in)
     session_running: (session-running)
