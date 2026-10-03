@@ -1,17 +1,22 @@
 #!/usr/bin/env nu
 # capture.nu — tests for tasks/capture.nu.
 #
-# capture is what stands between the owner's Mac and a public repo, so these
-# check that a secret or a personal path stops it, and that what it lets
-# through is cleaned. Everything happens in a temp folder.
+# capture is what stands between a Mac and a config folder that may be shared,
+# so these check that a secret or a personal path stops it, that what it lets
+# through is cleaned, and that it only touches the config in the folder.
+# Everything happens in a temp folder.
 #
 #   nu tests/capture.nu
 
 const CAPTURE = path self ../tasks/capture.nu
 
-# Run capture from a made-up Claude folder into a made-up destination.
+# Run capture from a made-up Claude folder into a made-up config folder,
+# named in a made-up ~/.config/claude-rig/config.toml.
 def capture [home: path, dest: path]: nothing -> record {
-  with-env { CLAUDE_HOME: $home, RIG_CAPTURE_DEST: $dest } {
+  let rig_home = $"($dest)-rig-home"
+  mkdir $rig_home
+  {folder: $dest} | to toml | save --force ($rig_home | path join config.toml)
+  with-env { CLAUDE_HOME: $home, RIG_CONFIG: "", RIG_CONFIG_HOME: $rig_home } {
     ^$nu.current-exe $CAPTURE | complete
   }
 }
@@ -55,6 +60,34 @@ def test-clean-capture [root: path] {
   check ".DS_Store files are not" (not ($dest | path join skills good .DS_Store | path exists))
 }
 
+def test-other-files-kept [root: path] {
+  print "a config folder that is also a git repo with a README"
+  let home = make-home $root repo
+  let dest = $root | path join repo-out
+  mkdir ($dest | path join agents old)
+  ^git init -q $dest
+  "# My config" | save ($dest | path join README.md)
+  let git_config = open --raw ($dest | path join .git config)
+  "gone" | save ($dest | path join agents old AGENT.md)
+  let run = capture $home $dest
+  check "the capture succeeds" ($run.exit_code == 0)
+  check "the README is left alone" ((open --raw ($dest | path join README.md)) == "# My config")
+  check "the .git folder is left alone" ((open --raw ($dest | path join .git config)) == $git_config)
+  check "a config entry gone from ~/.claude is gone from the folder" (not ($dest | path join agents | path exists))
+  check "the skill is captured" ($dest | path join skills good SKILL.md | path exists)
+  let again = capture $home $dest
+  check "a second capture finds nothing to change" ($again.stdout =~ "already up to date")
+}
+
+def test-no-folder [root: path] {
+  print "a machine with no config folder chosen"
+  let home = make-home $root none
+  let rig_home = $root | path join none-rig-home
+  let run = with-env { CLAUDE_HOME: $home, RIG_CONFIG: "", RIG_CONFIG_HOME: $rig_home } { ^$nu.current-exe $CAPTURE | complete }
+  check "the capture stops with an error" ($run.exit_code != 0)
+  check "the error says how to make a folder" ($run.stderr =~ "config -- init")
+}
+
 def test-stops [root: path, name: string, text: string, problem: string] {
   let home = make-home $root $name
   let dest = $root | path join $"($name)-out"
@@ -76,6 +109,8 @@ def main [] {
   let root = mktemp --directory | path expand
   try {
     test-clean-capture $root
+    test-other-files-kept $root
+    test-no-folder $root
     print "a skill with a GitHub token in it"
     test-stops $root github $"token: ghp_('a' | fill --width 36 --character 'a')" "possible secret"
     print "a skill with an Anthropic key in it"

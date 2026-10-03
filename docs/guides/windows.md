@@ -24,6 +24,12 @@ To only look:
 
 winget installs git and mise; everything after is the same run as on a Mac ([A run](../concepts/a-run.md)). Then log in once when asked.
 
+To bring your Claude config, a folder or a git URL ([Your config](../concepts/config.md)):
+
+```powershell
+$env:RIG_CONFIG = 'https://github.com/you/claude-config.git'; irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1 | iex
+```
+
 ## Let your Mac reach it
 
 In PowerShell **as Administrator** on the PC, with your Mac's public key (`cat ~/.ssh/id_ed25519.pub` on the Mac) in place of `<your key>`:

@@ -3,6 +3,11 @@
 #
 #   irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1 | iex
 #
+# With your Claude config, a git URL (cloned to ~\.config\claude-rig\config) or a
+# folder. Without one the config step is skipped and everything else runs:
+#
+#   $env:RIG_CONFIG = '<git URL or folder>'; irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1 | iex
+#
 # To only look, without changing anything:
 #
 #   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1))) -DryRun
