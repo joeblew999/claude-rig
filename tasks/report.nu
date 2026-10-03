@@ -56,7 +56,7 @@ export def device-id []: nothing -> string {
   $id
 }
 
-# The write token: FLEET_API_WRITE_TOKEN, else the token file. Null if none.
+# The write token comes from FLEET_API_WRITE_TOKEN, else from the token file. Null if none.
 export def write-token [] {
   let from_env = $env.FLEET_API_WRITE_TOKEN? | default "" | str trim
   if $from_env != "" { return $from_env }
@@ -554,8 +554,8 @@ def flush [token: string]: nothing -> record {
 # Spool a report and send the spool. Never fails: says what happened in one
 # line: sent, spooled (and why), refused (and why), or skipped (and why).
 export def send-report [report: record]: nothing -> string {
-  let token = write-token
-  if $token == null {
+  let bearer = write-token
+  if $bearer == null {
     return $"skipped: no write token \(set FLEET_API_WRITE_TOKEN, or put it in (token-file))"
   }
   let dir = spool-dir
@@ -566,7 +566,7 @@ export def send-report [report: record]: nothing -> string {
   # Keep the spool to a day of reports: the oldest go first.
   let all = ls $dir | where name =~ '\.json$' | sort-by name
   if ($all | length) > $SPOOL_MAX { $all | first (($all | length) - $SPOOL_MAX) | each {|old| rm --force $old.name } | ignore }
-  let result = flush $token
+  let result = flush $bearer
   let mine = $result.refused | where file == $name
   if ($file | path exists) {
     $"spooled: ($result.waiting)"
@@ -590,13 +590,13 @@ export def report-now [reason: string, --command: string = "session"]: nothing -
 # --- Reading the fleet -------------------------------------------------------
 
 def list-fleet [as_json: bool] {
-  let token = read-token
-  if $token == null {
+  let bearer = read-token
+  if $bearer == null {
     fail report "no token to read fleet-api with: set FLEET_API_READ_TOKEN (or FLEET_API_WRITE_TOKEN)"
   }
   let url = $"(fleet-api-url)/api/devices"
   let response = try {
-    http get --full --allow-errors --max-time 15sec --headers [Authorization $"Bearer ($token)"] $url
+    http get --full --allow-errors --max-time 15sec --headers [Authorization $"Bearer ($bearer)"] $url
   } catch {|error|
     fail report $"could not reach (fleet-api-url): ($error.msg)"
   }
