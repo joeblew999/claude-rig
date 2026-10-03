@@ -21,6 +21,27 @@ Every ask from the owner goes here when it is said, with its status. What is don
 | Adoption by other users | The owner asked (3 Oct 2026) whether to make it a Claude plugin, said the rig should cover any Linux server over SSH and the docs be less office-centric, and asked whether repos should be consolidated or deleted. Plan: [Adoption](adoption.md). Pieces 1 to 3 started |
 | Make enrolling a machine as easy as possible | Today: one line on the machine, `push` from the Mac, or `mise run vm -- new linux <name>` for a UTM VM, plus one login (open a link, paste a code). See "needs owner" for removing the login. `vm new windows` is not run yet |
 
+## Single-source-of-truth debts
+
+Every place one fact or definition still lives twice ([rules](../rules.md): one source of truth). Listed 3 Oct 2026; each is fixed before new features.
+
+| # | Two copies of | Fix |
+|---|---|---|
+| 1 | charter's tasks, copied into fleet-api's `mise.toml` | charter publishes its tasks for include ([charter#32](https://github.com/joeblew999/charter/issues/32)) |
+| 2 | fleet-api's token task, reached by `push` through a local checkout | include fleet-api's tasks by git ref |
+| 3 | claude-rig's tasks, which other repos cannot include | mise file tasks |
+| 4 | the nushell pin: claude-rig's `mise.toml` and `mise/claude-rig.toml` | one pin |
+| 5 | charter's version: 0.9.0 in claude-rig and the UTM repo, 0.9.1 for fleet-api | one version everywhere |
+| 6 | the VM tool on the owner's Mac: v0.7.0 from mise, and a locally built keeper | release the UTM repo; the keeper runs the release |
+| 7 | the machine list: `~/.config/claude-rig/machines.json` and fleet-api's devices | `fleet` reads fleet-api; `machines.json` goes |
+| 8 | the fleet skill: the plugin, and a copy in the owner's `~/.claude/skills` | the plugin only |
+| 9 | secret scanning: `capture`'s patterns and `fnox scan` | one scanner, chosen by measuring both |
+| 10 | the release script: claude-rig's own and charter's | [charter#39](https://github.com/joeblew999/charter/issues/39) |
+| 11 | workflows written by hand, and charter's generated ones | [charter#36](https://github.com/joeblew999/charter/issues/36) |
+| 12 | the UTM repo's docs systems: charter's layout and its own docsite | docsite's features move into charter |
+| 13 | the Fern TypeScript SDK's missing-header workaround, in fleet-api's test and in claude-rig | fixed upstream ([fern#17775](https://github.com/fern-api/fern/issues/17775)); until then one shared helper |
+| 14 | pitchfork: several versions installed on the Mac | one pin, old installs removed |
+
 ## After fleet-api is wired up
 
 | Item | Notes |
