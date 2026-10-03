@@ -33,7 +33,7 @@ Claude runs the work on that machine, in its work folder, with that machine's se
 
 ## Let Claude do it
 
-Every rigged machine has the skill `claude-rig-fleet` (in `claude/skills/`), so Claude knows these commands. Ask a Claude session on your Mac, in the app or a terminal, something like "run the test suite on the Windows and Linux machines and tell me what differs", and it splits the job, gives each machine its piece with `fleet run`, and checks the answers before it reports.
+Every rigged machine has the skill `claude-rig-fleet` (in `claude/skills/`), so Claude knows these commands. The [plugin](plugin.md) brings the same skill, and the commands `/rig:fleet` and `/rig:work`. Ask a Claude session on your Mac, in the app or a terminal, something like "run the test suite on the Windows and Linux machines and tell me what differs", and it splits the job, gives each machine its piece with `fleet run`, and checks the answers before it reports.
 
 ## Limits
 
