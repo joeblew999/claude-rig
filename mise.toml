@@ -52,7 +52,7 @@ run = "nu tasks/config.nu"
 
 [tasks.push]
 description = "Rig a remote machine over SSH: mise run push user@host. Pass --dry-run to only look."
-run = "fnox exec -- nu tasks/push.nu"
+run = "nu tasks/push.nu"
 
 [tasks.test]
 description = "Run the tests: the config merge, the capture checks, where the config comes from, the claims, and the report to fleet-api, against throwaway folders"

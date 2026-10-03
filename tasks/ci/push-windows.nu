@@ -3,15 +3,17 @@
 # machine, as to any PC, and check what arrived.
 #
 # Run after `mise run ci:sshd`, which sets up the SSH server and the key. The
-# machine pushes to itself over localhost: a dry run, a first run that sends a
-# write token, a second run that changes nothing, and a dry run with
-# PowerShell as the SSH shell. CI only: it rigs this machine and changes its
+# machine pushes to itself over localhost: a dry run, a first run that makes
+# and sends the machine's fleet-api token (with a stand-in for fleet-api's
+# access:token task, so a made-up token), a second run that changes nothing
+# and keeps the token, and a dry run with PowerShell as the SSH shell. CI only: it rigs this machine and changes its
 # SSH server.
 #
 #   RIG_TEST_REF=<branch> mise run ci:push
 
 use ../lib.nu [is-windows powershell fail]
 use common.nu *
+use ../../tests/report.nu [fake-fleet-api]
 
 const FIXTURE = path self ../../tests/fixtures/config
 const PUSH = path self ../push.nu
@@ -30,6 +32,11 @@ def main [] {
   let target = $"($env.USERNAME)@localhost"
   let key = $nu.home-dir | path join .ssh push-test
   let home = $nu.home-dir
+  # fleet-api's checkout, as push finds it: a stand-in that makes made-up tokens.
+  let fleet_api = mktemp --directory | path expand
+  fake-fleet-api $fleet_api
+  $env.FLEET_API_DIR = $fleet_api
+  $env.MISE_TRUSTED_CONFIG_PATHS = $fleet_api
 
   # Run push.nu at this machine and return what it printed.
   let push = {|flags: list<string>|
@@ -57,11 +64,16 @@ def main [] {
   check "no config sent" (not ($home | path join .config claude-rig config.tar | path exists))
   check "no Claude Code" (not ($home | path join .local bin claude.exe | path exists))
 
-  # A made-up write token: the runner has no real one, and nothing reports here.
-  print "A first run over SSH, sending a write token"
-  with-env { FLEET_API_WRITE_TOKEN: "ci-made-up-token" } { do $push [] | ignore }
-  let token = $home | path join .config claude-rig fleet-api.token
-  check "the token was kept" ((open --raw $token | decode utf-8) == "ci-made-up-token")
+  print "A first run over SSH, making and sending the machine's fleet-api token"
+  let first = do $push []
+  let id = open --raw ($home | path join .config claude-rig device-id) | decode utf-8 | str trim
+  check $"the machine id was made first \(($id))" ($id =~ '^[0-9a-f]{16}$')
+  check "fleet-api's task made a token for that machine id" ((open ($fleet_api | path join tokens.json) | get device) == [$id])
+  let token = $home | path join .config claude-rig fleet-api-access.json
+  let kept = open --raw $token | decode utf-8 | from json
+  check "the token was kept" ($kept.client_id == "stub-1.access" and ($kept | get client_secret) == "stub-secret-1")
+  check "the secret was not printed" (not ($first | str contains "stub-secret"))
+  check "the machine reported once with it" ($first =~ 'report: once ')
   let acl = ^icacls $token | complete | get stdout
   print $acl
   check "only this user can read the token" (not ($acl =~ 'Everyone|BUILTIN\\|Authenticated Users|NT AUTHORITY'))
@@ -77,6 +89,7 @@ def main [] {
   print "A second run over SSH"
   let second = do $push []
   unchanged $second
+  check "the machine keeps its token" ($second =~ 'keeps its fleet-api token' and (open ($fleet_api | path join made) | into int) == 1)
   check "it said it finished" ($second =~ 'rigged\.')
 
   # Some PCs are set up with PowerShell as the SSH shell instead of cmd.exe.

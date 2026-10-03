@@ -3,14 +3,15 @@
 #
 # Builds one device report (fleet-api's DeviceReport, schema 1) from
 # `doctor --json`, what nushell reads about the machine and, where the VM
-# tool's keeper runs, the VMs it last wrote down; then posts it with the write
-# token through fleet-api.ts, which is fleet-api's generated TypeScript SDK
+# tool's keeper runs, the VMs it last wrote down; then posts it with the
+# machine's own Cloudflare Access service token through fleet-api.ts, which is
+# fleet-api's generated TypeScript SDK
 # (it checks the report against fleet-api's schema first). The session posts
 # `start`, `interval` every 5 minutes and `stop`; run by hand it posts `once`.
 #
 # A report is put in the spool folder first and taken out when fleet-api has
-# it, so one that could not be delivered is sent with the next. With no write
-# token nothing is posted, and nothing else is affected.
+# it, so one that could not be delivered is sent with the next. With no token
+# nothing is posted, and nothing else is affected.
 #
 # Nothing in a report names a person or a network: no user names, IP or MAC
 # addresses, serial numbers; the home folder is written as ~.
@@ -20,6 +21,7 @@
 #   nu tasks/report.nu --doctor <file>   use this doctor --json output
 #   nu tasks/report.nu --check           build the report, check it against fleet-api's schema, post nothing
 #   nu tasks/report.nu --list [--json]   the fleet, as fleet-api has it
+#   nu tasks/report.nu --whoami          {id, token_name, has_token}: the machine id (made if missing), for push
 
 use lib.nu *
 use userconfig.nu [rig-home]
@@ -44,8 +46,9 @@ const VMS_FRESH_S = 120
 # The machine id: 16 random hex digits, made once, kept here.
 export def device-id-file []: nothing -> path { rig-home | path join device-id }
 
-# The write token, readable by this machine's user alone.
-export def token-file []: nothing -> path { rig-home | path join fleet-api.token }
+# The machine's own Cloudflare Access service token for fleet-api,
+# {client_id, client_secret}, readable by this machine's user alone.
+export def access-file []: nothing -> path { rig-home | path join fleet-api-access.json }
 
 # Reports not yet delivered, one file each.
 export def spool-dir []: nothing -> path { rig-home | path join report-spool }
@@ -65,25 +68,48 @@ export def device-id []: nothing -> string {
   $id
 }
 
-# The write token comes from FLEET_API_WRITE_TOKEN, else from the token file. Null if none.
-export def write-token [] {
-  let from_env = $env.FLEET_API_WRITE_TOKEN? | default "" | str trim
-  if $from_env != "" { return $from_env }
-  let kept = read-text (token-file) | default "" | str trim
-  if $kept != "" { $kept } else { null }
+# The name of this machine's Access service token in fleet-api
+# (fleet-api-<name>): the machine's name, as fleet-api's access:token task
+# takes it, lower-case letters, digits and dashes.
+export def token-name []: nothing -> string {
+  let name = machine-name | split row "." | first | str lowercase | str replace --all --regex '[^a-z0-9-]+' "-" | str trim --char "-"
+  let name = $name | str substring 0..39 | str trim --char "-"
+  if $name == "" { "machine" } else { $name }
 }
 
-# A token to read the fleet with: FLEET_API_READ_TOKEN, else the write token.
-def read-token [] {
-  let from_env = $env.FLEET_API_READ_TOKEN? | default "" | str trim
-  if $from_env != "" { $from_env } else { write-token }
+# A client id or secret holds only these characters.
+const ACCESS_CHARS = '^[A-Za-z0-9._-]+$'
+
+# The credentials as the file keeps them, or null if they are not whole.
+export def access-from [text: any] {
+  let kept = try { $text | from json } catch { null }
+  if ($kept | describe) !~ '^record' { return null }
+  let id = $kept.client_id? | default "" | into string | str trim
+  let secret = $kept.client_secret? | default "" | into string | str trim
+  if $id !~ $ACCESS_CHARS or $secret !~ $ACCESS_CHARS { return null }
+  {client_id: $id, client_secret: $secret}
 }
 
-# Keep the write token in the token file, readable by this user alone.
-export def save-token [token: string] {
-  let file = token-file
+# The machine's Access service token: the two FLEET_API_ACCESS_CLIENT_*
+# variables when both are set, else the access file.
+# Null if there is none.
+export def access-token [] {
+  let id = $env.FLEET_API_ACCESS_CLIENT_ID? | default "" | str trim
+  let secret = $env.FLEET_API_ACCESS_CLIENT_SECRET? | default "" | str trim
+  if $id != "" and $secret != "" { return (access-from ({client_id: $id, client_secret: $secret} | to json)) }
+  access-from (read-text (access-file))
+}
+
+# The settings fleet-api.ts reads the token from.
+def access-env [token: record]: nothing -> record {
+  {FLEET_API_ACCESS_CLIENT_ID: $token.client_id, FLEET_API_ACCESS_CLIENT_SECRET: $token.client_secret}
+}
+
+# Keep the token in the access file, readable by this user alone.
+export def save-access [token: record] {
+  let file = access-file
   mkdir ($file | path dirname)
-  # Made empty and locked down first, so the token is never in a file others can read.
+  # Made empty and locked down first, so the secret is never in a file others can read.
   "" | save --force $file
   if (is-windows) {
     # A file made by an administrator also names Administrators and SYSTEM
@@ -92,24 +118,25 @@ export def save-token [token: string] {
   } else {
     ^chmod 600 $file
   }
-  $token | save --force $file
+  ($token | to json --raw) + "\n" | save --force $file
 }
 
-# The command push runs on a macOS or Linux machine to keep the token it
+# The command push runs on a macOS or Linux machine to keep the token file it
 # sends on stdin. From the remote's home folder, like the config push sends.
-export const TOKEN_UNIX_COMMAND = "sh -c 'umask 077 && mkdir -p .config/claude-rig && cat > .config/claude-rig/fleet-api.token && chmod 600 .config/claude-rig/fleet-api.token'"
+export const ACCESS_UNIX_COMMAND = "sh -c 'umask 077 && mkdir -p .config/claude-rig && cat > .config/claude-rig/fleet-api-access.json && chmod 600 .config/claude-rig/fleet-api-access.json'"
 
 # The PowerShell push sends on stdin to a Windows machine: the token file,
-# made empty, closed to everyone but the user, then filled.
-export def token-windows-script [token: string]: nothing -> string {
+# made empty, closed to everyone but the user, then filled. The text is
+# checked JSON of plain characters (access-from), so it is safe in quotes.
+export def access-windows-script [text: string]: nothing -> string {
   [
     "$dir = Join-Path $HOME '.config\\claude-rig'"
     "New-Item -ItemType Directory -Force -Path $dir | Out-Null"
-    "$file = Join-Path $dir 'fleet-api.token'"
+    "$file = Join-Path $dir 'fleet-api-access.json'"
     "Set-Content -Path $file -Value '' -NoNewline"
     "icacls $file /inheritance:r /grant:r ($env:USERNAME + ':F') /remove:g '*S-1-5-32-544' '*S-1-5-18' | Out-Null"
     "if ($LASTEXITCODE -ne 0) { exit 1 }"
-    $"Set-Content -Path $file -Value '($token)' -NoNewline -Encoding ascii"
+    $"Set-Content -Path $file -Value '($text)' -NoNewline -Encoding ascii"
     ""
   ] | str join "\n"
 }
@@ -578,9 +605,9 @@ export def fleet-api [command: string, settings: record = {}, --input: string = 
 
 # Post one spooled report. keep: false when it is done with, delivered or
 # refused for good; true when it should be tried again later.
-def post-file [file: path, token: string]: nothing -> record {
+def post-file [file: path, token: record]: nothing -> record {
   let body = open --raw $file | decode utf-8
-  let answer = fleet-api report {FLEET_API_WRITE_TOKEN: $token} --input $body
+  let answer = fleet-api report (access-env $token) --input $body
   if $answer.ok { return {keep: false, why: ""} }
   {keep: $answer.retry, why: $answer.why}
 }
@@ -588,7 +615,7 @@ def post-file [file: path, token: string]: nothing -> record {
 # Send what is in the spool, oldest first, stopping at the first that has to
 # wait. Returns why it stopped ("" when the spool is empty now), and the
 # reports fleet-api refused for good, which are dropped.
-def flush [token: string]: nothing -> record {
+def flush [token: record]: nothing -> record {
   let dir = spool-dir
   let files = if ($dir | path exists) { ls $dir | where name =~ '\.json$' | sort-by name | get name } else { [] }
   mut waiting = ""
@@ -608,9 +635,9 @@ def flush [token: string]: nothing -> record {
 # Spool a report and send the spool. Never fails: says what happened in one
 # line: sent, spooled (and why), refused (and why), or skipped (and why).
 export def send-report [report: record]: nothing -> string {
-  let bearer = write-token
-  if $bearer == null {
-    return $"skipped: no write token \(set FLEET_API_WRITE_TOKEN, or put it in (token-file))"
+  let access = access-token
+  if $access == null {
+    return $"skipped: no fleet-api token \(set FLEET_API_ACCESS_CLIENT_ID and FLEET_API_ACCESS_CLIENT_SECRET, or push gives the machine one in (access-file))"
   }
   let dir = spool-dir
   mkdir $dir
@@ -620,7 +647,7 @@ export def send-report [report: record]: nothing -> string {
   # Keep the spool to a day of reports: the oldest go first.
   let all = ls $dir | where name =~ '\.json$' | sort-by name
   if ($all | length) > $SPOOL_MAX { $all | first (($all | length) - $SPOOL_MAX) | each {|old| rm --force $old.name } | ignore }
-  let result = flush $bearer
+  let result = flush $access
   let mine = $result.refused | where file == $name
   if ($file | path exists) {
     $"spooled: ($result.waiting)"
@@ -644,11 +671,11 @@ export def report-now [reason: string, --command: string = "session"]: nothing -
 # --- Reading the fleet -------------------------------------------------------
 
 def list-fleet [as_json: bool] {
-  let bearer = read-token
-  if $bearer == null {
-    fail report "no token to read fleet-api with: set FLEET_API_READ_TOKEN (or FLEET_API_WRITE_TOKEN)"
+  let access = access-token
+  if $access == null {
+    fail report $"no fleet-api token to read the fleet with: set FLEET_API_ACCESS_CLIENT_ID and FLEET_API_ACCESS_CLIENT_SECRET, or put one in (access-file)"
   }
-  let answer = fleet-api list {FLEET_API_READ_TOKEN: $bearer}
+  let answer = fleet-api list (access-env $access)
   if not $answer.ok { fail report $answer.why }
   let list = $answer.answer
   if $as_json {
@@ -686,7 +713,12 @@ def main [
   --reason: string = "once"  # Why it is sent: once, start, interval, stop
   --list            # Print the fleet as fleet-api has it
   --json            # With --list: the answer as JSON
+  --whoami          # Print {id, token_name, has_token}: the machine id (made if missing), its token's name, whether it has one
 ] {
+  if $whoami {
+    print ({id: (device-id), token_name: (token-name), has_token: ((access-from (read-text (access-file))) != null)} | to json --raw)
+    return
+  }
   if $list {
     list-fleet $json
     return

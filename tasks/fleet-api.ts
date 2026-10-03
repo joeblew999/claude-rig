@@ -3,9 +3,11 @@
 // contract; report.nu builds the report and keeps the spool.
 //
 //   bun tasks/fleet-api.ts check  < report.json   does fleet-api's schema take it? posts nothing
-//   bun tasks/fleet-api.ts report < report.json   check it, then post it with FLEET_API_WRITE_TOKEN
-//   bun tasks/fleet-api.ts list                   the fleet, with FLEET_API_READ_TOKEN
+//   bun tasks/fleet-api.ts report < report.json   check it, then post it with the machine's Access token
+//   bun tasks/fleet-api.ts list                   the fleet, with the same token
 //
+// The machine's Cloudflare Access service token is FLEET_API_ACCESS_CLIENT_ID and
+// FLEET_API_ACCESS_CLIENT_SECRET (report.nu takes them from the environment or the machine's file).
 // FLEET_API_SDK is the SDK's folder (report.nu finds it with mise: the tool list installs it from
 // fleet-api's release). FLEET_API_URL, if set, is where fleet-api is; otherwise the SDK's default.
 // It prints one JSON object, {"ok": true, "answer": ...} or {"ok": false, "retry": ..., "why": ...},
@@ -43,10 +45,22 @@ async function checked() {
   return parsed.value;
 }
 
-function client(token: string | undefined) {
-  if (!token) return fail("no token", true);
+// The client, as fleet-api's own live test makes it (fleet-api's test/sdk-live-test.mjs). The SDK
+// should send both Access headers from FLEET_API_ACCESS_CLIENT_ID and _SECRET by itself, but its
+// generated auth sends only one of the two, so it is given them as headers with its own auth off.
+// Upstream: fern-api/fern#17775 (when fixed: new FleetClient({ baseUrl, maxRetries: 0, ... }), the variables doing the rest)
+function client() {
+  const id = process.env.FLEET_API_ACCESS_CLIENT_ID ?? "";
+  const hidden = process.env.FLEET_API_ACCESS_CLIENT_SECRET ?? "";
+  if (id === "" || hidden === "") return fail("no Access token", true);
   // One try each: report.nu's spool is the retry.
-  return new FleetClient({ baseUrl: process.env.FLEET_API_URL || FleetEnvironment.Default.base, token, maxRetries: 0, timeoutInSeconds: 15 });
+  return new FleetClient({
+    baseUrl: process.env.FLEET_API_URL || FleetEnvironment.Default.base,
+    maxRetries: 0,
+    timeoutInSeconds: 15,
+    auth: false,
+    headers: { "CF-Access-Client-Id": id, "CF-Access-Client-Secret": hidden },
+  });
 }
 
 // What went wrong, and whether trying again later can help: not when fleet-api refused what was sent.
@@ -69,7 +83,7 @@ if (command === "check") {
 }
 if (command === "report") {
   const report = await checked();
-  const fleet = client(process.env.FLEET_API_WRITE_TOKEN);
+  const fleet = client();
   try {
     const posted = await fleet.devices.report({ id: report.id, body: report });
     done({ ok: true, answer: serialization.DevicePosted.jsonOrThrow(posted, { unrecognizedObjectKeys: "passthrough" }) }, 0);
@@ -78,7 +92,7 @@ if (command === "report") {
   }
 }
 if (command === "list") {
-  const fleet = client(process.env.FLEET_API_READ_TOKEN);
+  const fleet = client();
   try {
     const list = await fleet.devices.list();
     done({ ok: true, answer: serialization.DeviceList.jsonOrThrow(list, { unrecognizedObjectKeys: "passthrough" }) }, 0);

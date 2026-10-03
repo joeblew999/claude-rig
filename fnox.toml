@@ -11,8 +11,7 @@ env = "exec"
 type = "keychain"
 service = "fnox"
 
-# fleet-api issues these two tokens, so they carry its name (fleet-api's docs/guides/tokens.md).
-# Optional: without them push still rigs; the machine just does not report.
+# None at this commit. A machine's fleet-api token is made by fleet-api's own access:token task,
+# under fleet-api's fnox profile (push runs it in fleet-api's checkout), and kept on that machine
+# alone (docs/concepts/reporting.md).
 [profiles.claude-rig.secrets]
-FLEET_API_WRITE_TOKEN = { provider = "keychain", value = "FLEET_API_WRITE_TOKEN", if_missing = "ignore", description = "fleet-api's write token: push gives it to the machine it rigs, which posts its reports with it" }
-FLEET_API_READ_TOKEN = { provider = "keychain", value = "FLEET_API_READ_TOKEN", if_missing = "ignore", description = "fleet-api's read token: reads the fleet's reports" }

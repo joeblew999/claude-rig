@@ -12,12 +12,12 @@ Read this before you add a secret to one of the owner's repos, run a task that n
 
 | Rule | Why |
 |---|---|
-| **A repo's own secret is named after the repo:** its name in capitals, dashes as underscores, then what it is: `FLEET_API_WRITE_TOKEN`, `CLAUDE_RIG_…`, `UTM_VM_…` | Every repo's values sit in one place, the keychain under the service `fnox`. The prefix keeps two repos' `WRITE_TOKEN` apart and says whose a secret is |
+| **A repo's own secret is named after the repo:** its name in capitals, dashes as underscores, then what it is: `FLEET_API_ACCESS_CLIENT_ID`, `CLAUDE_RIG_…`, `UTM_VM_…` | Every repo's values sit in one place, the keychain under the service `fnox`. The prefix keeps two repos' `CLIENT_ID` apart and says whose a secret is |
 | **Shared credentials keep their plain names:** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `GITHUB_TOKEN` | Tools read those names themselves (wrangler, `gh`), and they belong to no one repo |
-| **A secret keeps the name of the repo that issues it, also in the repos that use it.** claude-rig declares `FLEET_API_WRITE_TOKEN`, not a name of its own | One keychain item, so one place to rotate it |
+| **A secret keeps the name of the repo that issues it, also in the repos that use it.** A machine's fleet-api token is `FLEET_API_ACCESS_CLIENT_ID` and `FLEET_API_ACCESS_CLIENT_SECRET` in claude-rig too, not a name of its own | One name, so one place to look it up and rotate it |
 | **One name everywhere:** the fnox name, the keychain item and the environment variable the code reads are the same | Nothing to look up. A name that differs from its item hides which item a task really uses |
 | **Values live in the keychain; each repo's `fnox.toml` holds names only** and is committed | A `fnox.toml` with no values is safe in a public repo. A plaintext `default` is a value: never use one for a real secret |
-| **Tasks get secrets through `fnox exec`** in the task's `run` line (`push` in `mise.toml`) | fnox's own advice: "Put `fnox exec` in tasks that need secrets so those tasks work from a shell, an editor, or CI" ([mise integration](https://fnox.jdx.dev/guide/mise-integration)). mise's fnox env plugin is called "an incomplete experiment" on the same page |
+| **Tasks get secrets through `fnox exec`** in the task's `run` line (fleet-api's `access:token`, which `push` runs) | fnox's own advice: "Put `fnox exec` in tasks that need secrets so those tasks work from a shell, an editor, or CI" ([mise integration](https://fnox.jdx.dev/guide/mise-integration)). mise's fnox env plugin is called "an incomplete experiment" on the same page |
 | **A repo sees only the secrets it declares.** They go in a profile named after the repo, and the repo's `mise.toml` sets `FNOX_PROFILE` to it and `FNOX_NO_DEFAULTS=true` | fnox loads the global config under every repo's config ([configuration](https://fnox.jdx.dev/reference/configuration#file-location)), so a plain `fnox exec` hands a task every global secret. On the owner's Mac, `fnox list` in a folder with its own `fnox.toml` showed over 50 names; with the profile alone, only the folder's own |
 | **Each `fnox.toml` starts with `root = true` and `env = "exec"`** | `root` stops the search at the repo. `env = "exec"` keeps the values out of an interactive shell, where an agent could read them, while `fnox exec` still gets them |
 | **A secret a task can do without is `if_missing = "ignore"`** | CI runners and other people's machines have no keychain items. The task then says itself what it skips |
@@ -26,10 +26,9 @@ Read this before you add a secret to one of the owner's repos, run a task that n
 
 ## How a task gets a secret
 
-claude-rig's `fnox.toml` declares two tokens that fleet-api issues: `FLEET_API_WRITE_TOKEN` and `FLEET_API_READ_TOKEN`. `push` runs under `fnox exec`, so both are in its environment when the keychain has them:
+claude-rig's `fnox.toml` declares no secret at this commit. The one secret a rigged machine needs, its own fleet-api token, is made by fleet-api's `access:token` task, which runs under fleet-api's `fnox exec` with fleet-api's Cloudflare credentials; `push` runs that task in fleet-api's checkout and sends the result to the machine ([Reporting](reporting.md#the-machines-token)). So claude-rig's tasks see no Cloudflare credential.
 
 ```sh
-mise run push -- user@host     # runs fnox exec -- nu tasks/push.nu user@host
 fnox list                      # the names this repo declares, no values
 fnox check --all               # whether each one resolves; prints no values
 ```
@@ -43,8 +42,6 @@ fnox set CLAUDE_RIG_EXAMPLE --provider keychain   # writes the name into fnox.to
 ```
 
 Then add `if_missing` and a `description` to the line it wrote. `fnox remove` takes the name out of `fnox.toml` but leaves the keychain item; delete that in Keychain Access.
-
-At this commit no task of claude-rig reads either token yet: reporting to fleet-api is the branch that will. It reads them from the environment, which is where `fnox exec` puts them.
 
 ## How an agent uses a token without seeing it
 
@@ -79,6 +76,6 @@ The proxy's limits, from the same trial and fnox's [proxy guide](https://fnox.jd
 
 ## Limits
 
-- **Values are on the owner's Mac only.** Linux and Windows machines in the fleet have none of the owner's keychain items. A task that needs a secret runs on the Mac, or the secret is given to the machine for one purpose, as fleet-api's write token is.
+- **Values are on the owner's Mac only.** Linux and Windows machines in the fleet have none of the owner's keychain items. A task that needs a secret runs on the Mac, or a secret is made for the machine alone, as its fleet-api token is.
 - **macOS may ask once per keychain item** the first time a program reads it.
 - **`fnox scan` is a heuristic.** fnox: "a clean scan does not prove that files or git history contain no secrets" ([scan](https://fnox.jdx.dev/cli/scan)). It skips what `.gitignore` ignores.

@@ -18,32 +18,10 @@
 use lib.nu *
 use remote.nu *
 
-# The command that prints a machine's doctor report, for its OS.
-# On Windows the script goes to PowerShell on stdin: quoting it through
-# cmd.exe goes wrong.
-def doctor-on [os: string]: nothing -> record {
-  if $os == "Windows" {
-    {
-      command: "powershell -NoProfile -ExecutionPolicy Bypass -Command -"
-      input: '& "$env:LOCALAPPDATA\mise\shims\nu.exe" "$HOME\.claude-rig\tasks\doctor.nu" --json'
-    }
-  } else {
-    {
-      command: 'PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH" nu "$HOME/.claude-rig/tasks/doctor.nu" --json'
-      input: null
-    }
-  }
-}
-
 # One machine's report, or why there is none.
 def ask [machine: record]: nothing -> record {
   let options = ssh-options ($machine.port? | default null) ($machine.identity? | default null) ($machine.known_hosts? | default null)
-  let how = doctor-on $machine.os
-  let result = if $how.input == null {
-    ^ssh -n -o BatchMode=yes ...$options $machine.target $how.command | complete
-  } else {
-    $how.input | ^ssh -o BatchMode=yes ...$options $machine.target $how.command | complete
-  }
+  let result = run-nu $options $machine.target (nu-on $machine.os doctor.nu [--json])
   let facts = try { $result.stdout | from json } catch { null }
   if $result.exit_code == 0 and $facts != null {
     $facts | insert target $machine.target | insert reachable true
