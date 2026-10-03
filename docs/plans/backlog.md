@@ -34,7 +34,7 @@ Every ask from the owner goes here when it is said, with its status. What is don
 
 | Item | Recommendation |
 |---|---|
-| Log every machine in from one captured secret | Remote Control needs a full claude.ai login. A `claude setup-token` token cannot do it (Claude's docs say so). Copying the Mac's own login to other machines is not documented, and those logins refresh themselves, so one copy may log out the others, including the Mac. Recommended: each machine logs in once, about 30 seconds. If you want the copy tried, it should be on a spare machine, accepting that the Mac may need to log in again |
+| Log every machine in from one captured secret | Now decided by the lead: [Login](login.md). The owner wants it fully automatic for every developer |
 | What a machine may do without asking | The Mac's settings (`bypassPermissions`) are applied to every machine. That is right for a VM or a dedicated worker. Say if some machines should be stricter |
 | Should this Mac stay an always-on worker | It is one now, as the test. To turn it off: `mise run unrig` in the repo |
 
