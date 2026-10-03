@@ -1,4 +1,4 @@
-# Adapted from charter's issue forms (cmd/charter/github/ in joeblew999/charter), so issues here have the same shape.
+# Written by `charter workflows` from its template (in the charter tool): change the template, not this file.
 # Each field's label is a heading in the issue body; `charter issue feature` prints the same headings.
 name: Feature request
 description: Your repository needs this project to do something it does not.

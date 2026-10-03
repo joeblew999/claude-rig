@@ -11,6 +11,8 @@ irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1 |
 mise run push -- user@host                                                                                  # any machine, from your Mac
 ```
 
+**Pre-release:** the always-on session has run logged in only on a Mac so far; on Windows and Linux it is tested up to the login ([Findings](docs/findings.md)). While this line is here, `mise run release:publish` marks each release a pre-release.
+
 Then: [Getting started](docs/getting-started.md). Everything else is in [the docs](docs/README.md) ([as a site](https://joeblew999.github.io/claude-rig/)).
 
 [MIT](LICENSE). The rig ships no Claude config or skills of its own: you bring yours ([Your config](docs/concepts/config.md)).

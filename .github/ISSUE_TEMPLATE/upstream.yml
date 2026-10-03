@@ -1,4 +1,4 @@
-# Adapted from charter's issue forms (cmd/charter/github/ in joeblew999/charter), so issues here have the same shape.
+# Written by `charter workflows` from its template (in the charter tool): change the template, not this file.
 # Each field's label is a heading in the issue body; `charter issue upstream` prints the same headings.
 name: Upstream bug
 description: A bug that looks like it is in a project this one is built on, to be recorded in docs/upstream.md and fixed there.

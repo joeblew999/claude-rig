@@ -1,5 +1,7 @@
-# Runs the bootstrap on fresh macOS, Linux and Windows machines.
-# The second run must change nothing.
+# Runs the bootstrap on fresh macOS, Linux and Windows machines, then the checks.
+# Every check is a mise task, so the same command runs locally (docs/contributing.md).
+# The only other steps: the checkout, the bootstrap itself (it installs mise, so it
+# cannot run under mise), and putting mise on PATH for the steps after it.
 name: test
 
 on:
@@ -15,22 +17,16 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
+      - uses: actions/checkout@v7.0.1
+      - uses: jdx/mise-action@v5.0.1
       - run: mise run lint
       - run: mise run docs:check
-      - name: No file git would commit looks like a secret
-        run: mise run secrets:scan
+      - run: mise run github:check
+      - run: mise run secrets:scan
       # The runner has no keychain: the secrets fnox.toml declares are optional, so a task under
       # fnox exec still runs.
-      - name: A task under fnox exec runs without a keychain
-        run: mise run push -- --help
-      - name: The plugin and the marketplace file pass Claude Code's validator
-        run: |
-          curl -fsSL https://claude.ai/install.sh | bash
-          export PATH="$HOME/.local/bin:$PATH"
-          claude --version
-          mise run plugin:check
+      - run: mise run push -- --help
+      - run: mise run ci:plugin
 
   unix:
     strategy:
@@ -39,58 +35,13 @@ jobs:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Dry run changes nothing
-        run: |
-          sh bootstrap.sh --dry-run
-          test ! -e "$HOME/.config/mise/conf.d/claude-rig.toml"
-          test ! -e "$HOME/.claude/.rig-manifest"
-
-      # The runner has no config, so this is a run with none chosen.
-      - name: First run, with no config
-        run: |
-          sh bootstrap.sh | tee first-run.log
-          grep -E '^ +skip +config: none chosen' first-run.log
-          test ! -e "$HOME/.claude/.rig-manifest"
-
-      - name: Tools are in place
-        run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
-          claude --version
-          for tool in gh jq yq rg fd node go bun nu fnox pitchfork; do
-            command -v "$tool"
-          done
-
-      # A made-up config from the tests, given the way a user gives theirs.
-      - name: A run with a config
-        run: |
-          RIG_CONFIG="$PWD/tests/fixtures/config" sh bootstrap.sh
-          jq -e '.remoteControlAtStartup == true and .model == "opus"' "$HOME/.claude/settings.json"
-          test -f "$HOME/.claude/skills/alpha/SKILL.md"
-
-      - name: Tests
-        run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
-          nu tests/apply.nu
-          nu tests/capture.nu
-          nu tests/config.nu
-          nu tests/claims.nu
-          nu tests/report.nu
-
-      - name: Doctor reports this machine
-        run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
-          nu tasks/doctor.nu --json | tee doctor.json
-          jq -e '.tools_installed and .config_applied and (.logged_in | not) and (.claude_version != null)' doctor.json
-
-      - name: Second run changes nothing
-        run: |
-          RIG_CONFIG="$PWD/tests/fixtures/config" sh bootstrap.sh | tee second-run.log
-          if grep -E '^ +(change|would) ' second-run.log; then
-            echo "The second run made changes." >&2
-            exit 1
-          fi
+      - uses: actions/checkout@v7.0.1
+      # The thing under test, on a bare runner with no config. ci:bootstrap checks what it printed.
+      - run: sh bootstrap.sh | tee first-run.log
+      # What a new shell on the machine has on PATH: mise, claude and the tools' shims.
+      - run: printf '%s\n' "$HOME/.local/bin" "$HOME/.local/share/mise/shims" >> "$GITHUB_PATH"
+      - run: mise run ci:bootstrap
+      - run: mise run test
 
   windows:
     strategy:
@@ -102,97 +53,17 @@ jobs:
       run:
         shell: powershell
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
+      # The thing under test, on a bare runner with no config. ci:bootstrap checks what it printed.
+      - run: .\bootstrap.ps1 | Tee-Object first-run.log
+      # What a new window on the machine has on PATH: the user PATH the bootstrap and the rig set.
+      - run: ([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') | Add-Content $env:GITHUB_PATH
+      - run: mise run ci:bootstrap
+      - run: mise run test
+      - run: mise run ci:windows-session
 
-      - name: Dry run changes nothing
-        run: |
-          .\bootstrap.ps1 -DryRun
-          if (Test-Path "$HOME\.config\mise\conf.d\claude-rig.toml") { throw 'the dry run installed the tool list' }
-          if (Test-Path "$HOME\.claude\.rig-manifest") { throw 'the dry run applied the config' }
-
-      # The runner has no config, so this is a run with none chosen.
-      - name: First run, with no config
-        run: |
-          .\bootstrap.ps1 | Tee-Object first-run.log
-          if (-not (Select-String -Path first-run.log -Pattern '^ +skip +config: none chosen')) { throw 'the config step was not skipped' }
-          if (Test-Path "$HOME\.claude\.rig-manifest") { throw 'a config was applied' }
-
-      - name: Tools are in place
-        run: |
-          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
-          claude --version
-          foreach ($tool in 'gh', 'jq', 'yq', 'rg', 'fd', 'node', 'go', 'bun', 'nu', 'fnox', 'pitchfork') {
-            (Get-Command $tool).Source
-          }
-
-      # A made-up config from the tests, given the way a user gives theirs.
-      - name: A run with a config
-        run: |
-          $env:RIG_CONFIG = "$PWD\tests\fixtures\config"
-          .\bootstrap.ps1
-          $settings = Get-Content "$HOME\.claude\settings.json" -Raw | ConvertFrom-Json
-          if (-not $settings.remoteControlAtStartup) { throw 'remote control is not on' }
-          if (-not (Test-Path "$HOME\.claude\skills\alpha\SKILL.md")) { throw 'skills are missing' }
-
-      - name: Tests
-        run: |
-          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
-          nu tests\apply.nu
-          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
-          nu tests\capture.nu
-          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
-          nu tests\config.nu
-          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
-          nu tests\claims.nu
-          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
-          nu tests\report.nu
-          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
-
-      - name: Doctor reports this machine
-        run: |
-          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
-          $report = nu tasks\doctor.nu --json | Out-String
-          $report
-          $facts = $report | ConvertFrom-Json
-          if (-not ($facts.tools_installed -and $facts.config_applied -and $facts.claude_version)) { throw 'the report is wrong' }
-          if ($facts.logged_in) { throw 'the runner cannot be logged in' }
-
-      - name: Second run changes nothing
-        run: |
-          $env:RIG_CONFIG = "$PWD\tests\fixtures\config"
-          .\bootstrap.ps1 | Tee-Object second-run.log
-          if (Select-String -Path second-run.log -Pattern '^ +(change|would) ') {
-            throw 'The second run made changes.'
-          }
-
-      # The runner cannot log in to Claude, so the server itself cannot connect.
-      # This checks the parts around it: the sign-in entry and the keep-alive loop.
-      - name: Session starts at sign-in and stays up
-        env:
-          RIG_ASSUME_LOGGED_IN: "1"
-          RIG_CONFIG: tests\fixtures\config
-        run: |
-          .\bootstrap.ps1
-          $startup = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\claude-rig.cmd"
-          if (-not (Test-Path $startup)) { throw 'no sign-in entry' }
-          Get-Content $startup
-          Start-Sleep -Seconds 25
-          $session = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'session\.nu' }
-          if (-not $session) { throw 'the session is not running' }
-          # The keeper beside it holds the PC awake (the runner is an administrator, so powercfg can list it).
-          $keeper = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -match 'EncodedCommand' -and $session.ProcessId -contains $_.ParentProcessId }
-          if (-not $keeper) { throw 'the keep-awake is not running' }
-          powercfg /requests
-          Get-Content "$HOME\.claude-rig-session.log" -ErrorAction SilentlyContinue | Select-Object -First 10
-          .\bootstrap.ps1 | Tee-Object session-second-run.log
-          if (Select-String -Path session-second-run.log -Pattern '^ +(change|would) ') {
-            throw 'The second run with the session made changes.'
-          }
-
-  # push.nu against a Windows SSH server set up the way a real PC would be:
-  # OpenSSH Server from Windows' own optional features, an administrator
-  # account, the key in administrators_authorized_keys, and cmd.exe as the
-  # SSH shell. The runner pushes to itself over localhost.
+  # A push over SSH to a Windows machine set up the way a real PC would be; the runner pushes
+  # to itself over localhost (tasks/ci/sshd.ps1, tasks/ci/push-windows.nu).
   push-windows:
     strategy:
       fail-fast: false
@@ -206,108 +77,12 @@ jobs:
     env:
       # Rig from the branch under test, not from main.
       RIG_TEST_REF: ${{ github.head_ref || github.ref_name }}
-      # The config push sends: the tests' made-up one. The SSH session on the
-      # other end does not get this variable, so it takes in what was sent.
-      RIG_CONFIG: ${{ github.workspace }}\tests\fixtures\config
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@v7.0.1
       # Only nushell is needed here, to run push.nu.
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v5.0.1
         with:
           install_args: nu
-
-      - name: Install and start OpenSSH Server
+      - run: mise run ci:sshd
         timeout-minutes: 40
-        run: |
-          if (Get-Service sshd -ErrorAction SilentlyContinue) {
-            'sshd is already on this image'
-          } else {
-            Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-          }
-          # With no DefaultShell value, the SSH shell is cmd.exe.
-          Remove-ItemProperty -Path HKLM:\SOFTWARE\OpenSSH -Name DefaultShell -ErrorAction SilentlyContinue
-          Start-Service sshd
-          Get-Service sshd
-          Get-Content "$env:ProgramData\ssh\sshd_config" | Where-Object { $_ -notmatch '^\s*(#|$)' }
-          # Use Windows' own ssh for the push, not the one that comes with Git.
-          Add-Content $env:GITHUB_PATH "$env:SystemRoot\System32\OpenSSH"
-
-      - name: Authorize a throwaway key
-        run: |
-          $ssh = "$HOME\.ssh"
-          New-Item -ItemType Directory -Force $ssh | Out-Null
-          ssh-keygen -q -t ed25519 -N '""' -f "$ssh\push-test"
-          if ($LASTEXITCODE -ne 0) { throw 'could not make a key' }
-          $public = Get-Content "$ssh\push-test.pub"
-          Add-Content "$ssh\authorized_keys" $public -Encoding ascii
-          # An administrator's keys are read from this file, and only if
-          # nobody but Administrators and SYSTEM can touch it.
-          $admin = "$env:ProgramData\ssh\administrators_authorized_keys"
-          Set-Content $admin $public -Encoding ascii
-          icacls.exe $admin /inheritance:r /grant '*S-1-5-32-544:F' /grant '*S-1-5-18:F'
-          if ($LASTEXITCODE -ne 0) { throw 'could not set the permissions' }
-          # For CI only: the SSH session does not get this step's environment,
-          # and without a token mise hits GitHub's anonymous rate limit.
-          [Environment]::SetEnvironmentVariable('GITHUB_TOKEN', $env:GITHUB_TOKEN, 'User')
-
-      - name: The key logs in and the SSH shell is cmd.exe
-        run: |
-          $login = @('-n', '-i', "$HOME\.ssh\push-test", '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'UserKnownHostsFile=NUL', "$env:USERNAME@localhost")
-          $shell = ssh @login 'echo %COMSPEC%'
-          if ($LASTEXITCODE -ne 0) { throw 'the key was not accepted' }
-          "SSH shell: $shell"
-          if ($shell -notmatch 'cmd\.exe\s*$') { throw 'the SSH shell is not cmd.exe' }
-          # For the record: whether this machine has a uname for push to find.
-          $uname = ssh @login 'uname -s'
-          "uname -s: exit code $LASTEXITCODE, said '$uname'"
-          $global:LASTEXITCODE = 0
-
-      - name: Dry run over SSH changes nothing
-        run: |
-          (Get-Command ssh).Source
-          mise exec -- nu tasks/push.nu "$env:USERNAME@localhost" --identity "$HOME\.ssh\push-test" --known-hosts NUL --ref $env:RIG_TEST_REF --dry-run
-          if ($LASTEXITCODE -ne 0) { throw "the push failed with exit code $LASTEXITCODE" }
-          if (Test-Path "$HOME\.claude-rig") { throw 'the dry run left a clone of the rig' }
-          if (Test-Path "$HOME\.config\mise\conf.d\claude-rig.toml") { throw 'the dry run installed the tool list' }
-          if (Test-Path "$HOME\.claude\.rig-manifest") { throw 'the dry run applied the config' }
-          if (Test-Path "$HOME\.config\claude-rig\config.tar") { throw 'the dry run sent the config' }
-          if (Test-Path "$HOME\.local\bin\claude.exe") { throw 'the dry run installed Claude Code' }
-
-      # A made-up write token: the runner has no real one, and nothing reports here.
-      - name: First run over SSH, sending a write token
-        env:
-          FLEET_API_WRITE_TOKEN: ci-made-up-token
-        run: |
-          mise exec -- nu tasks/push.nu "$env:USERNAME@localhost" --identity "$HOME\.ssh\push-test" --known-hosts NUL --ref $env:RIG_TEST_REF
-          if ($LASTEXITCODE -ne 0) { throw "the push failed with exit code $LASTEXITCODE" }
-          $token = "$HOME\.config\claude-rig\fleet-api.token"
-          if ((Get-Content $token -Raw) -ne 'ci-made-up-token') { throw 'the token was not kept' }
-          $acl = icacls $token | Out-String
-          $acl
-          if ($acl -match 'Everyone|BUILTIN\\|Authenticated Users|NT AUTHORITY') { throw 'others can read the token' }
-
-      - name: Claude Code and config are in place
-        run: |
-          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
-          claude --version
-          if ($LASTEXITCODE -ne 0) { throw 'claude does not run' }
-          if (-not (Test-Path "$HOME\.claude\skills\alpha\SKILL.md")) { throw 'the config push sent is missing' }
-          if (Test-Path "$HOME\.config\claude-rig\config.tar") { throw 'the sent config was not taken in' }
-
-      - name: Second run over SSH changes nothing
-        run: |
-          mise exec -- nu tasks/push.nu "$env:USERNAME@localhost" --identity "$HOME\.ssh\push-test" --known-hosts NUL --ref $env:RIG_TEST_REF | Tee-Object push-second-run.log
-          if ($LASTEXITCODE -ne 0) { throw "the push failed with exit code $LASTEXITCODE" }
-          if (Select-String -Path push-second-run.log -Pattern '^ +(change|would) ') {
-            throw 'The second run made changes.'
-          }
-          if (-not (Select-String -Path push-second-run.log -Pattern 'rigged\.')) { throw 'the push did not say it finished' }
-
-      # Some PCs are set up with PowerShell as the SSH shell instead of cmd.exe.
-      - name: Dry run with PowerShell as the SSH shell
-        run: |
-          New-ItemProperty -Path HKLM:\SOFTWARE\OpenSSH -Name DefaultShell -PropertyType String -Force -Value "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" | Out-Null
-          mise exec -- nu tasks/push.nu "$env:USERNAME@localhost" --identity "$HOME\.ssh\push-test" --known-hosts NUL --ref $env:RIG_TEST_REF --dry-run | Tee-Object push-powershell.log
-          if ($LASTEXITCODE -ne 0) { throw "the push failed with exit code $LASTEXITCODE" }
-          if (-not (Select-String -Path push-powershell.log -Pattern 'rig: dry run finished')) { throw 'the rig did not run on the remote' }
+      - run: mise run ci:push

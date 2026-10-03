@@ -1,0 +1,28 @@
+# On a version tag (vX.Y.Z, pushed by `mise run release -- vX.Y.Z`): the GitHub Release, with notes
+# from the commits since the previous tag (tasks/release.nu). On a pull request that changes the
+# release, a dry run that prints the notes and publishes nothing.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths: [tasks/release.nu, README.md, mise.toml, .github/workflows/release.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GITHUB_TOKEN: ${{ github.token }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0 # the notes are made from the history since the previous tag
+      - uses: jdx/mise-action@v5.0.1
+      - run: mise run release:publish
