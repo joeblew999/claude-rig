@@ -21,6 +21,15 @@ Every ask from the owner goes here when it is said, with its status. What is don
 | Adoption by other users | The owner asked (3 Oct 2026) whether to make it a Claude plugin, said the rig should cover any Linux server over SSH and the docs be less office-centric, and asked whether repos should be consolidated or deleted. Plan: [Adoption](adoption.md). Pieces 1 to 3 started |
 | Make enrolling a machine as easy as possible | Today: one line on the machine, `push` from the Mac, or `mise run vm -- new linux <name>` for a UTM VM, plus one login (open a link, paste a code). See "needs owner" for removing the login. `vm new windows` is not run yet |
 
+## After fleet-api is wired up
+
+| Item | Notes |
+|---|---|
+| Import a repo's tasks instead of copying them | The owner's trick (3 Oct 2026): a project takes another repo's mise tasks with `[task_config] includes = ["git::https://github.com/<owner>/<repo>.git//<folder>?ref=<tag>"]`, pinned to a release, as `remy-auth-app` does with remy-auth's tasks. So upgrading every user is a ref bump |
+| charter publishes its tasks for include | `charter new` copies the example's tasks into each project (fleet-api has its own full mise file). Better: charter publishes its task folder at each release and projects include it by tag. How charter publishes and versions that folder is charter's design: raise it with the session that works in charter, don't edit under it |
+| claude-rig's tasks includable by any project | Today tasks are `mise.toml` entries running `nu tasks/<x>.nu` relative to the project, which breaks when included. They become mise file tasks (scripts with a mise header in the included folder), so a project can include `push`, `fleet` and `vm` by tag with no checkout |
+| fleet-api includes charter's tasks | Once charter publishes them |
+
 ## Needs owner
 
 | Item | Recommendation |
