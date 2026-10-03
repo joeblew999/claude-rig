@@ -24,3 +24,5 @@ Newest last. Only what was run.
 | 2026-10-02 | The tests | the owner's Mac and every CI runner | Pass. Each was checked to fail with the code broken on purpose |
 | 2026-10-02 | `fleet run` | the owner's Mac | Answered in 4.9 s. To an Ubuntu VM that is not logged in: "Not logged in", as expected |
 | 2026-10-02 | `push` to Linux in UTM | an Ubuntu 24.04 VM made with `irgo-winvm vm-create -os linux` | Dry run, first run, second run with no changes. Stops at the login step, as designed |
+| 2026-10-03 | The rig link, and a bootstrap with a linked checkout | the owner's Mac | The run made `~/.claude-rig` a link to the checkout (dry run, run, second run `ok`). The piped bootstrap then said the link is the owner's checkout and left its branch alone |
+| 2026-10-03 | The `claude-rig-fleet` skill's command | the owner's Mac | `mise -C ~/.claude-rig run fleet -- run <this machine> "..." --json` answered in 2.8 s |

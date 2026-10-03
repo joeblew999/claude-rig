@@ -147,7 +147,9 @@ if [ -n "$here" ] && [ -f "$here/tasks/rig.nu" ]; then
   say "ok       rig checkout at $RIG_DIR"
 elif [ "$DRY_RUN" = 1 ]; then
   # Look at the rig without leaving a clone behind.
-  if [ -d "$RIG_DIR/.git" ]; then
+  if [ -L "$RIG_DIR" ]; then
+    say "ok       rig checkout at $RIG_DIR (a link to your checkout: update it yourself)"
+  elif [ -d "$RIG_DIR/.git" ]; then
     say "ok       rig clone at $RIG_DIR (a real run brings it up to date)"
   else
     would "keep a clone of the rig in $RIG_DIR"
@@ -162,6 +164,9 @@ elif [ "$DRY_RUN" = 1 ]; then
   git clone -q --depth 1 --branch "$RIG_REF" "$RIG_REPO" "$tmp/rig"
   run_rig "$tmp/rig" "$@"
   exit 0
+elif [ -L "$RIG_DIR" ]; then
+  # A link the rig made to a checkout someone works in: never move it.
+  say "ok       rig checkout at $RIG_DIR (a link to your checkout: update it yourself)"
 elif [ -d "$RIG_DIR/.git" ]; then
   git -C "$RIG_DIR" fetch -q origin "$RIG_REF"
   if [ "$(git -C "$RIG_DIR" rev-parse HEAD)" = "$(git -C "$RIG_DIR" rev-parse FETCH_HEAD)" ]; then

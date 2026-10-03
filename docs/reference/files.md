@@ -10,7 +10,7 @@ parent: Reference
 
 | Path | What it is | Written by |
 |---|---|---|
-| `~/.claude-rig/` | The rig's clone | the bootstraps |
+| `~/.claude-rig/` | The rig's clone, or a link to the checkout the rig ran from | the bootstraps, or the run |
 | `~/.config/mise/conf.d/claude-rig.toml` | The tool list | the run |
 | `~/.bashrc`, `~/.profile` or `~/.zshrc` | A block marked `claude-rig` putting the tools on PATH, if the file does not set up mise already (macOS, Linux) | the run |
 | The user `Path` variable | The same, on Windows | the run |

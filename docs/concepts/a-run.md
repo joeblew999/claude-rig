@@ -15,6 +15,7 @@ parent: Concepts
 | Tools | `mise/claude-rig.toml` copied to `~/.config/mise/conf.d/`, then `mise install`. The tools work in every folder; the machine's own mise config is left alone | `tasks/rig.nu` |
 | Shell | `~/.local/bin` and the mise shims on PATH for new shells | `tasks/rig.nu` |
 | Claude Code | Claude's native installer, if `claude` is missing. It updates itself after that | `tasks/rig.nu` |
+| The rig link | `~/.claude-rig` made to lead to the rig, when the rig runs from a checkout elsewhere (a link; a junction on Windows). Skills and docs can then always say `~/.claude-rig`. A bootstrap never moves a linked checkout | `tasks/rig.nu` |
 | Config | `claude/` merged into `~/.claude` ([Your config](config.md)) | `tasks/apply.nu` |
 | Login | `claude auth login`, if not logged in ([Login and the session](login-and-session.md)) | `tasks/enroll.nu` |
 | Session | The always-on session, started and kept running | `tasks/enroll.nu`, `tasks/session.nu` |

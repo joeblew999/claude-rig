@@ -31,6 +31,10 @@ mise run fleet -- run --all "which version of node do you have?"
 
 Claude runs the work on that machine, in its work folder, with that machine's settings, and the answer comes back here. `--all` gives every machine the same work at the same time. The machine must be logged in.
 
+## Let Claude do it
+
+Every rigged machine has the skill `claude-rig-fleet` (in `claude/skills/`), so Claude knows these commands. Ask a Claude session on your Mac, in the app or a terminal, something like "run the test suite on the Windows and Linux machines and tell me what differs", and it splits the job, gives each machine its piece with `fleet run`, and checks the answers before it reports.
+
 ## Limits
 
 - **One piece of work per machine per call.** Splitting a job into pieces and choosing machines for them is not built ([Backlog](../plans/backlog.md)).

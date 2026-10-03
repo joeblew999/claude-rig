@@ -128,7 +128,9 @@ function Invoke-Bootstrap {
         Invoke-Rig $PSScriptRoot
     } elseif ($DryRun) {
         # Look at the rig without leaving a clone behind.
-        if (Test-Path (Join-Path $rigDir '.git')) {
+        if ((Test-Path $rigDir) -and (Get-Item $rigDir -Force).LinkType) {
+            Say "ok       rig checkout at $rigDir (a link to your checkout: update it yourself)"
+        } elseif (Test-Path (Join-Path $rigDir '.git')) {
             Say "ok       rig clone at $rigDir (a real run brings it up to date)"
         } else {
             Would "keep a clone of the rig in $rigDir"
@@ -146,7 +148,10 @@ function Invoke-Bootstrap {
             Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
         }
     } else {
-        if (Test-Path (Join-Path $rigDir '.git')) {
+        if ((Test-Path $rigDir) -and (Get-Item $rigDir -Force).LinkType) {
+            # A link the rig made to a checkout someone works in: never move it.
+            Say "ok       rig checkout at $rigDir (a link to your checkout: update it yourself)"
+        } elseif (Test-Path (Join-Path $rigDir '.git')) {
             Run git -C $rigDir fetch -q origin $rigRef
             $head = & git -C $rigDir rev-parse HEAD
             $fetched = & git -C $rigDir rev-parse FETCH_HEAD
