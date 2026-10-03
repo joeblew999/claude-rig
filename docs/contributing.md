@@ -36,14 +36,15 @@ mise run ci:bootstrap -- "$HOME.first-run.log"                  # the checks CI 
 
 ## Cut a release
 
-A release is a version tag on a commit of `main` whose CI passed. One command checks that and pushes the tag:
+A release is cut from your machine in about a minute: one command runs the checks CI runs, tags `main`, and publishes the GitHub Release. GitHub's CI then checks the tag on every OS; a failure there is fixed with a patch release.
 
 ```sh
 mise run release -- vX.Y.Z --dry-run   # every check, and what it would do; changes nothing
-mise run release -- vX.Y.Z             # the same checks, then tags main and pushes the tag
+mise run release -- vX.Y.Z             # the same checks, then tag, push and publish
+mise run release -- vX.Y.Z --wait-ci   # also require GitHub's CI to have passed on HEAD
 ```
 
-It refuses unless the working tree is clean, HEAD is `main` as on GitHub, the tag is new here and on GitHub, and the latest `test` run on HEAD passed. The tag starts `.github/workflows/release.yml`, which runs `mise run release:publish`: the GitHub Release, with the commits since the previous tag as its notes and a link to [Findings](findings.md) at that tag. While the root `README.md` has a line starting `**Pre-release:**`, the release is marked a pre-release. On a pull request that changes the release, the same workflow prints the notes and publishes nothing.
+It refuses unless the working tree is clean, HEAD is `main` as on GitHub, the tag is new here and on GitHub, and `lint`, `test`, `docs:check`, `github:check` and `ci:bootstrap` pass here. It then pushes the tag and runs `mise run release:publish`: the GitHub Release, with the commits since the previous tag as its notes and a link to [Findings](findings.md) at that tag. While the root `README.md` has a line starting `**Pre-release:**`, the release is marked a pre-release. `.github/workflows/release.yml` only checks publishing on pull requests (a dry run) and can republish a tag by hand.
 
 charter's own release commands are not used yet: `charter release` attaches built files from `dist/` and this repo ships none, and charter has no command that cuts the tag ([charter#39](https://github.com/joeblew999/charter/issues/39)). [Releases](https://github.com/joeblew999/claude-rig/releases).
 

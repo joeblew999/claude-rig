@@ -3,9 +3,10 @@
 # release, a dry run that prints the notes and publishes nothing.
 name: release
 
+# A release is cut and published from a machine with `mise run release -- vX.Y.Z`.
+# This workflow only checks, on pull requests, that publishing still works (a dry run),
+# and can republish a tag by hand.
 on:
-  push:
-    tags: ["v*"]
   pull_request:
     paths: [tasks/release.nu, README.md, mise.toml, .github/workflows/release.yml]
   workflow_dispatch:
