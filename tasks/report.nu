@@ -134,8 +134,6 @@ export def access-windows-script [text: string]: nothing -> string {
     "New-Item -ItemType Directory -Force -Path $dir | Out-Null"
     "$file = Join-Path $dir 'fleet-api-access.json'"
     "Set-Content -Path $file -Value '' -NoNewline"
-    "icacls $file /inheritance:r /grant:r ($env:USERNAME + ':F') /remove:g '*S-1-5-32-544' '*S-1-5-18' | Out-Null"
-    "if ($LASTEXITCODE -ne 0) { exit 1 }"
     $"Set-Content -Path $file -Value '($text)' -NoNewline -Encoding ascii"
     ""
   ] | str join "\n"
