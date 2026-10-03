@@ -12,7 +12,7 @@ Run as `mise run <task>`; flags go after `--` (`mise run doctor -- --json`).
 |---|---|---|
 | `rig` | `--dry-run` | The run, on this machine ([A run](../concepts/a-run.md)) |
 | `doctor` | `--json` | A report on this machine, then what a run would change. `--json`: the report alone |
-| `push` | `<user@host>`, `--dry-run`, `--ref`, `--port`, `--identity`, `--known-hosts` | Sends your config folder and rigs another machine over SSH ([guide](../guides/push.md)) |
+| `push` | `<user@host>`, `--dry-run`, `--ref`, `--port`, `--identity`, `--known-hosts` | Sends your config folder and rigs another machine over SSH ([guide](../guides/push.md)). Runs under `fnox exec`, with this repo's secrets ([Secrets](../concepts/secrets.md)) |
 | `fleet` | `--json`; `add <user@host> [--windows --port --identity]`; `forget <user@host>`; `run <machine> "<work>"` or `run --all "<work>"`, with `--wait --caller --label --json`; `claims <machine> [--json]`; `release <machine> <claim id> [--force --caller]`; `slots <machine> [<n>]` | Every rigged machine in one table, giving them work, and who is using them. `run` exits 6 when a machine is busy ([guide](../guides/fleet.md), [Claims](../concepts/claims.md)) |
 | `report` | `--print`, `--doctor <file>`, `--reason <reason>`; `--list [--json]` | Posts this machine's report to fleet-api now. `--print` shows it and posts nothing; `--doctor` takes doctor's facts from a file of `doctor --json` output; `--list` prints the fleet as fleet-api has it ([Reporting](../concepts/reporting.md)) |
 | `vm` | `new <linux\|windows> <name> [--ref]`, `rm <name>` | Makes a UTM VM on this Mac, turns SSH on and rigs it; or deletes it ([guide](../guides/vm.md)) |
@@ -23,6 +23,7 @@ Run as `mise run <task>`; flags go after `--` (`mise run doctor -- --json`).
 | `test` | | The tests, against throwaway folders: the config merge, capture, where the config comes from, the claims, and the report |
 | `plugin:check` | | Claude Code's validator on the marketplace file and the plugin ([Plugin commands](plugin.md)); needs `claude` |
 | `lint` | | shellcheck on `bootstrap.sh`, and nushell's checker on every task and test |
+| `secrets:scan` | | `fnox scan` on every file git would commit; fails on anything that looks like a secret ([Secrets](../concepts/secrets.md)) |
 | `docs:setup` | | Writes the docs site's config, `docs/writing.md` and `docs/llms.txt` |
 | `docs:lint`, `docs:check` | | Checks `docs/`; `docs:check` also fails if the generated files are stale |
 | `docs:review` | | Has Claude bring `docs/` into line with `docs/writing.md` |

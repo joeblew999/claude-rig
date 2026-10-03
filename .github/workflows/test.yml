@@ -19,6 +19,12 @@ jobs:
       - uses: jdx/mise-action@v2
       - run: mise run lint
       - run: mise run docs:check
+      - name: No file git would commit looks like a secret
+        run: mise run secrets:scan
+      # The runner has no keychain: the secrets fnox.toml declares are optional, so a task under
+      # fnox exec still runs.
+      - name: A task under fnox exec runs without a keychain
+        run: mise run push -- --help
       - name: The plugin and the marketplace file pass Claude Code's validator
         run: |
           curl -fsSL https://claude.ai/install.sh | bash

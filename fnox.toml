@@ -1,0 +1,18 @@
+#:schema https://fnox.jdx.dev/schema.json
+# claude-rig's secrets: their names and where the values are kept, never a value.
+# The rules: docs/concepts/secrets.md. mise.toml selects the claude-rig profile, alone, so a
+# task run under `fnox exec` gets these and nothing else from the global fnox config.
+root = true
+# Into `fnox exec` commands only, never into an interactive shell an agent may be using.
+env = "exec"
+
+# The same provider as the owner's global fnox config, so this file also works without it.
+[providers.keychain]
+type = "keychain"
+service = "fnox"
+
+# fleet-api issues these two tokens, so they carry its name (fleet-api's docs/guides/tokens.md).
+# Optional: without them push still rigs; the machine just does not report.
+[profiles.claude-rig.secrets]
+FLEET_API_WRITE_TOKEN = { provider = "keychain", value = "FLEET_API_WRITE_TOKEN", if_missing = "ignore", description = "fleet-api's write token: push gives it to the machine it rigs, which posts its reports with it" }
+FLEET_API_READ_TOKEN = { provider = "keychain", value = "FLEET_API_READ_TOKEN", if_missing = "ignore", description = "fleet-api's read token: reads the fleet's reports" }
