@@ -66,12 +66,54 @@ run = ["claude plugin validate .", "claude plugin validate plugin"]
 description = "Check the scripts"
 run = [
   "shellcheck bootstrap.sh",
-  "nu --commands 'for f in (glob tasks/*.nu | append (glob tests/*.nu)) { nu-check --debug $f }'",
+  "nu --commands 'for f in (glob tasks/**/*.nu | append (glob tests/*.nu)) { nu-check --debug $f }'",
 ]
+
+[tasks."github:setup"]
+description = "Write the issue forms and labels in .github/ from charter, keeping this repo's bug form and extra labels"
+run = "nu tasks/github.nu"
+
+[tasks."github:check"]
+description = "Fail if the issue forms and labels in .github/ differ from what charter writes"
+run = "nu tasks/github.nu --check"
 
 [tasks."secrets:scan"]
 description = "Fail if a file git would commit looks like it holds a secret (fnox scan)"
 run = "fnox scan ."
+
+# ---- CI: every check the workflows run, so the same command runs here ----
+# The ci:* tasks rig the machine they run on: they run in CI, or with HOME set to a throwaway
+# folder (docs/contributing.md).
+
+[tasks."ci:bootstrap"]
+description = "CI: check a machine the bootstrap has just rigged: tools, a run with a config, doctor, a second run, a dry run on a bare home"
+run = "nu tasks/ci/bootstrap.nu"
+
+[tasks."ci:windows-session"]
+description = "CI, Windows: the always-on session starts at sign-in and stays up, with its keep-awake beside it"
+run = "nu tasks/ci/always-on.nu"
+
+[tasks."ci:sshd"]
+description = "CI only, Windows: set this machine up as an SSH server with a throwaway key, for ci:push"
+run = "powershell -NoProfile -ExecutionPolicy Bypass -File tasks/ci/sshd.ps1"
+
+[tasks."ci:push"]
+description = "CI only, Windows: push a rig over SSH to this machine and check what arrived"
+run = "nu tasks/ci/push-windows.nu"
+
+[tasks."ci:plugin"]
+description = "plugin:check, installing Claude Code first in CI"
+run = "nu tasks/ci/plugin.nu"
+
+# ---- releases: one command and a tag ----
+
+[tasks.release]
+description = "Tag main as a release and push the tag: mise run release -- vX.Y.Z. Pass --dry-run to only check"
+run = "nu tasks/release.nu"
+
+[tasks."release:publish"]
+description = "The GitHub Release for the tag the workflow runs on, with notes from the commits. Not on a tag: a dry run"
+run = "nu tasks/release.nu publish"
 
 # ---- docs: the docs site in docs/, kept the way charter keeps it ----
 
