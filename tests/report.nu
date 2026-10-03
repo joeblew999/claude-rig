@@ -9,7 +9,7 @@
 #
 #   nu tests/report.nu
 
-use ../tasks/report.nu [TOKEN_UNIX_COMMAND]
+use ../tasks/report.nu [TOKEN_UNIX_COMMAND auth-from]
 use ../tasks/awake.nu [awake-plan run-windows-keeper keeper-state]
 
 const REPORT = path self ../tasks/report.nu
@@ -256,17 +256,16 @@ def test-token-file [root: path] {
 }
 
 # The session's keep-awake holds sleep off while what it wraps runs.
-# A stand-in for `claude` that says what `claude auth status` says, email
-# and organisation included, so the test can see they are left out.
+# What `claude auth status` says, email and organisation included, so the
+# test can see they are left out.
+const AUTH_STATUS = '{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty","email":"someone@example.com","orgId":"0b9c1d2e","orgName":"Someone Example Org"}'
+
+# A stand-in for `claude` that answers `claude auth status` with it. Not on
+# Windows, where a script does not stand in for claude.exe.
 def fake-claude [dir: path] {
   mkdir $dir
-  let answer = '{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty","email":"someone@example.com","orgId":"0b9c1d2e","orgName":"Someone Example Org"}'
-  if $nu.os-info.name == "windows" {
-    $"@echo ($answer)\r\n" | save --force ($dir | path join claude.cmd)
-  } else {
-    $"#!/bin/sh\necho '($answer)'\n" | save --force ($dir | path join claude)
-    ^chmod +x ($dir | path join claude)
-  }
+  $"#!/bin/sh\necho '($AUTH_STATUS)'\n" | save --force ($dir | path join claude)
+  ^chmod +x ($dir | path join claude)
 }
 
 def test-login [root: path] {
@@ -274,8 +273,12 @@ def test-login [root: path] {
   let claude_home = $root | path join login-claude
   mkdir $claude_home
   cp $CREDENTIALS ($claude_home | path join .credentials.json)
+  let auth = auth-from $AUTH_STATUS
+  check "from claude auth status: logged in, and how, only" ($auth == {status: "ok", logged_in: true, auth_method: "claude.ai"})
+  check "a status that is not JSON says why" ((auth-from "not logged in").status == "unknown")
   let bin = $root | path join login-bin
-  fake-claude $bin
+  let faked = $nu.os-info.name != "windows"
+  if $faked { fake-claude $bin }
   let run = {|home|
     with-env { RIG_CONFIG_HOME: ($root | path join login-rig), CLAUDE_HOME: $home, PATH: ([$bin] ++ $env.PATH), FLEET_API_WRITE_TOKEN: "" } {
       ^$nu.current-exe $REPORT --print --doctor $FIXTURE | complete
@@ -284,7 +287,11 @@ def test-login [root: path] {
   let result = do $run $claude_home
   check "report --print succeeds" ($result.exit_code == 0)
   let login = $result.stdout | from json | get rig.login
-  check "it says logged in, and how" ($login.status == "ok" and $login.logged_in and $login.auth_method == "claude.ai")
+  if $faked {
+    check "it says logged in, and how" ($login.status == "ok" and $login.logged_in and $login.auth_method == "claude.ai")
+  } else {
+    print $"    --  this machine's own claude says: ($login | reject --optional refresh_expires refresh_expires_why | to json --raw)"
+  }
   let stored = open --raw $CREDENTIALS | decode utf-8 | from json | get claudeAiOauth
   let leaked = [$stored.accessToken $stored.refreshToken accessToken refreshToken sk-ant] | where {|secret| $result.stdout | str contains $secret }
   if ($leaked | is-not-empty) { print $"        in the report: ($leaked | str join ', ')" }

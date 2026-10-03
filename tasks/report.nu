@@ -404,25 +404,27 @@ def refresh-expiry []: nothing -> record {
   expiry-from $text
 }
 
-# The login, as the login plan needs it: logged in, how, and when the
-# refresh token runs out. From `claude auth status`, of which only loggedIn
-# and authMethod are taken (never the email or the organisation), and the
-# stored login, of which only the expiry is taken (never a token).
-def login-section []: nothing -> record {
-  let status = with-env {PATH: ($env.PATH ++ [(local-bin)])} {
-    if (have claude) { ^claude auth status | complete } else { null }
-  }
-  if $status == null { return (unknown "Claude is not installed") }
-  let info = try { $status.stdout | from json } catch { null }
-  if $info == null { return (unknown "claude auth status gave no answer") }
-  let expiry = refresh-expiry
+# What `claude auth status` printed, as the report has it: only loggedIn and
+# authMethod, never the email or the organisation.
+export def auth-from [text: string]: nothing -> record {
+  let info = try { $text | from json } catch { null }
+  if ($info | describe) !~ '^record' { return (unknown "claude auth status gave no answer") }
   {
     status: "ok"
     logged_in: ($info.loggedIn? | default false)
     auth_method: ($info.authMethod? | default "" | into string | cut $in)
-    refresh_expires: $expiry.at?
-    refresh_expires_why: $expiry.why?
   } | compact --empty
+}
+
+# The login, as the login plan needs it: logged in, how (status says whether
+# `claude auth status` answered), and when the refresh token runs out (with
+# its own why when that is not known). Never a token.
+def login-section []: nothing -> record {
+  let auth = with-env {PATH: ($env.PATH ++ [(local-bin)])} {
+    if (have claude) { auth-from (^claude auth status | complete | get stdout) } else { unknown "Claude is not installed" }
+  }
+  let expiry = refresh-expiry
+  $auth | merge ({refresh_expires: $expiry.at?, refresh_expires_why: $expiry.why?} | compact)
 }
 
 # --- doctor --json -----------------------------------------------------------
