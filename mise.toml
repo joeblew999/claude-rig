@@ -5,6 +5,14 @@ shellcheck = "latest"
 "github:joeblew999/charter" = "0.9.0"
 # The VM tool: makes the UTM VMs that `mise run vm` enrols (macOS only).
 "github:joeblew999/irgo-windows-vm" = { version = "0.7.0", os = ["macos"], asset_pattern = "irgo-winvm-darwin-arm64", bin = "irgo-winvm" }
+# Secrets: names in fnox.toml, values in the keychain (docs/concepts/secrets.md). Same pin as the tool list.
+fnox = "1.36.0"
+
+[env]
+# Every `fnox` run in this repo, `fnox exec` in the tasks included, sees only the secrets fnox.toml
+# declares for claude-rig: not the rest of the global fnox config (docs/concepts/secrets.md).
+FNOX_PROFILE = "claude-rig"
+FNOX_NO_DEFAULTS = "true"
 
 [tasks.rig]
 description = "Rig this machine: tools, Claude Code, Claude config. Pass --dry-run to only look."
@@ -44,7 +52,7 @@ run = "nu tasks/config.nu"
 
 [tasks.push]
 description = "Rig a remote machine over SSH: mise run push user@host. Pass --dry-run to only look."
-run = "nu tasks/push.nu"
+run = "fnox exec -- nu tasks/push.nu"
 
 [tasks.test]
 description = "Run the tests: the config merge, the capture checks, where the config comes from, the claims, and the report to fleet-api, against throwaway folders"
@@ -60,6 +68,10 @@ run = [
   "shellcheck bootstrap.sh",
   "nu --commands 'for f in (glob tasks/*.nu | append (glob tests/*.nu)) { nu-check --debug $f }'",
 ]
+
+[tasks."secrets:scan"]
+description = "Fail if a file git would commit looks like it holds a secret (fnox scan)"
+run = "fnox scan ."
 
 # ---- docs: the docs site in docs/, kept the way charter keeps it ----
 
