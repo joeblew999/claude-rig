@@ -6,7 +6,7 @@ Read, in this order:
 
 1. [docs/README.md](docs/README.md): what is what, and the index of every page.
 2. [docs/rules.md](docs/rules.md): the working rules, including how work is split between a lead and helpers. They are binding.
-3. [docs/plans/backlog.md](docs/plans/backlog.md): what is open.
+3. What is open: [the plan issues](https://github.com/joeblew999/claude-rig/issues?q=is%3Aopen+label%3Aplan), and the order of all the work in [charter#44](https://github.com/joeblew999/charter/issues/44).
 4. The page for the part you are changing, from the index.
 5. [docs/writing.md](docs/writing.md) before you write or change a page in `docs/`.
 
