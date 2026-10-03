@@ -70,6 +70,7 @@ jobs:
           nu tests/capture.nu
           nu tests/config.nu
           nu tests/claims.nu
+          nu tests/report.nu
 
       - name: Doctor reports this machine
         run: |
@@ -138,6 +139,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
           nu tests\claims.nu
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
+          nu tests\report.nu
+          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
 
       - name: Doctor reports this machine
         run: |
@@ -170,6 +173,10 @@ jobs:
           Start-Sleep -Seconds 25
           $session = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'session\.nu' }
           if (-not $session) { throw 'the session is not running' }
+          # The keeper beside it holds the PC awake (the runner is an administrator, so powercfg can list it).
+          $keeper = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -match 'EncodedCommand' -and $session.ProcessId -contains $_.ParentProcessId }
+          if (-not $keeper) { throw 'the keep-awake is not running' }
+          powercfg /requests
           Get-Content "$HOME\.claude-rig-session.log" -ErrorAction SilentlyContinue | Select-Object -First 10
           .\bootstrap.ps1 | Tee-Object session-second-run.log
           if (Select-String -Path session-second-run.log -Pattern '^ +(change|would) ') {
@@ -261,10 +268,18 @@ jobs:
           if (Test-Path "$HOME\.config\claude-rig\config.tar") { throw 'the dry run sent the config' }
           if (Test-Path "$HOME\.local\bin\claude.exe") { throw 'the dry run installed Claude Code' }
 
-      - name: First run over SSH
+      # A made-up write token: the runner has no real one, and nothing reports here.
+      - name: First run over SSH, sending a write token
+        env:
+          FLEET_API_WRITE_TOKEN: ci-made-up-token
         run: |
           mise exec -- nu tasks/push.nu "$env:USERNAME@localhost" --identity "$HOME\.ssh\push-test" --known-hosts NUL --ref $env:RIG_TEST_REF
           if ($LASTEXITCODE -ne 0) { throw "the push failed with exit code $LASTEXITCODE" }
+          $token = "$HOME\.config\claude-rig\fleet-api.token"
+          if ((Get-Content $token -Raw) -ne 'ci-made-up-token') { throw 'the token was not kept' }
+          $acl = icacls $token | Out-String
+          $acl
+          if ($acl -match 'Everyone|BUILTIN\\|Authenticated Users|NT AUTHORITY') { throw 'others can read the token' }
 
       - name: Claude Code and config are in place
         run: |

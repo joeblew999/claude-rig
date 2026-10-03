@@ -8,9 +8,16 @@
 # On Windows, where pitchfork cannot start at boot, it is started at sign-in
 # with --keep-alive and restarts the server itself.
 #
+# While it runs it keeps the machine awake (awake.nu) and reports to
+# fleet-api (report.nu): `start` when it starts, `interval` every 5 minutes,
+# `stop` when the server ends (or, when pitchfork stops it, pitchfork's
+# on_stop hook does). A report that fails never stops the session.
+#
 #   nu tasks/session.nu [--keep-alive]
 
 use lib.nu *
+use awake.nu [awake-plan run-windows-keeper]
+use report.nu [report-now EVERY_S]
 
 # Where the Windows session writes what the server prints. Started fresh on
 # every start, so it holds the latest run only.
@@ -18,18 +25,30 @@ def log-file []: nothing -> path {
   $nu.home-dir | path join .claude-rig-session.log
 }
 
-# Start the server and wait for it to stop.
-def serve [] {
+# Start the server and wait for it to stop. `prefix` keeps the machine awake
+# while it runs (awake-plan).
+def serve [prefix: list<string>] {
   # The first start on a machine asks "Enable Remote Control? (y/n)" once.
   # Rigging a machine is the owner saying yes, so answer it. On every later
   # start nothing is asked and the answer is ignored.
-  # On macOS the session also keeps the Mac awake while it runs, on mains
-  # power only (caffeinate -s): a Mac that sleeps drops out of the Claude app
-  # and stops its VMs. Closing the lid still puts it to sleep.
-  if $nu.os-info.name == "macos" and (have caffeinate) {
-    "y\n" | ^caffeinate -i -s claude remote-control --name (machine-name)
-  } else {
-    "y\n" | ^claude remote-control --name (machine-name)
+  let command = $prefix ++ [claude remote-control --name (machine-name)]
+  "y\n" | run-external ...$command
+}
+
+# Post a report and say what came of it. Never fails.
+def report [reason: string] {
+  print $"report: ($reason) ((report-now $reason))"
+}
+
+# Report `start`, then `interval` every EVERY_S seconds, until killed. Run
+# in a job, beside the server. `start` waits a little, so that on a restart
+# the `stop` from pitchfork's hook is the older of the two.
+def reporter [] {
+  sleep 10sec
+  report start
+  loop {
+    sleep ($EVERY_S * 1sec)
+    report interval
   }
 }
 
@@ -42,12 +61,26 @@ def main [
 
   cd (work-dir)
 
+  let awake = awake-plan
+  if $awake.note != "" { print $"session: ($awake.note)" }
+  let reporting = job spawn { reporter }
+
   if not $keep_alive {
-    serve
+    # When pitchfork stops the session, this process ends with it, and
+    # pitchfork's on_stop hook reports `stop` (enroll.nu). When the server
+    # ends by itself, the session reports it here.
+    let failed = try { serve $awake.prefix; false } catch { true }
+    try { job kill $reporting }
+    report stop
+    # A server that failed must still look failed, so pitchfork restarts it.
+    if $failed { exit 1 }
     return
   }
+  # Windows: the keeper holds sleep off for as long as this process lives.
+  # The session is ended by stopping the process, so no `stop` is sent.
+  if (is-windows) { job spawn { try { run-windows-keeper } catch { } } | ignore }
   loop {
-    try { serve out+err> (log-file) } catch { }
+    try { serve $awake.prefix out+err> (log-file) } catch { }
     sleep 15sec
   }
 }

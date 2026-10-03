@@ -2,6 +2,7 @@
 # log in, and keep a Claude session running. Used by rig.nu.
 
 use lib.nu *
+use report.nu [token-file save-token]
 
 const DAEMON = "claude-rig"
 
@@ -78,15 +79,18 @@ def session-script []: nothing -> path {
 }
 
 # What pitchfork should run: this machine's session, restarted if it stops,
-# started again after a reboot.
+# started again after a reboot. When pitchfork stops it, its on_stop hook
+# sends the `stop` report: the session itself is gone by then.
 def daemon-wanted []: nothing -> record {
   let script = session-script
+  let report = $script | path dirname | path join report.nu
   {
     run: $"\"($nu.current-exe)\" \"($script)\""
     dir: (work-dir)
     boot_start: true
     retry: true
     ready_output: "Connected"
+    hooks: {on_stop: $"\"($nu.current-exe)\" \"($report)\" --reason stop"}
   }
 }
 
@@ -224,6 +228,32 @@ export def --env session-step [] {
     ok $"session is running as \"(machine-name)\""
   } else {
     change $"start the session as \"(machine-name)\"" { start-session }
+  }
+}
+
+# --- The fleet-api write token ---------------------------------------------
+
+# Keep the write token the session reports with. It comes from
+# FLEET_API_WRITE_TOKEN in this run's environment (the one-line bootstrap),
+# or push has already put it in the token file. It is never printed.
+export def --env token-step [] {
+  let file = token-file
+  let wanted = $env.FLEET_API_WRITE_TOKEN? | default "" | str trim
+  let kept = read-text $file | default "" | str trim
+  if $wanted == "" and $kept == "" {
+    skipped "reporting to fleet-api: no write token (set FLEET_API_WRITE_TOKEN, or push from a machine that has it)"
+    return
+  }
+  if $wanted != "" and $wanted != $kept {
+    change $"keep the fleet-api write token in ($file), readable by this user only" { save-token $wanted }
+    return
+  }
+  # On macOS and Linux, also check no one else can read it.
+  let mode = if (is-windows) { "rw-------" } else { ls -l $file | get 0.mode }
+  if $mode != "rw-------" {
+    change $"make ($file) readable by this user only" { ^chmod 600 $file }
+  } else {
+    ok $"fleet-api write token \(($file))"
   }
 }
 

@@ -1,0 +1,31 @@
+{
+  "name": "studio-1",
+  "os": "macos",
+  "arch": "aarch64",
+  "rig_commit": "4fd9d8e",
+  "tools_installed": true,
+  "claude_version": "2.1.288 (Claude Code)",
+  "config": "a folder: /Users/someone/claude-config",
+  "config_applied": true,
+  "logged_in": true,
+  "session_running": false,
+  "work_dir": "/Users/someone/work",
+  "slots": 2,
+  "claims": [
+    {
+      "id": "20261003-102233-ab12c",
+      "who": "someone@studio-1",
+      "what": "run the tests on macOS",
+      "since": "2026-10-03T10:22:33.120+07:00",
+      "until": "2026-10-03T10:24:33.120+07:00"
+    },
+    {
+      "id": "20261003-102240-cd34e",
+      "who": "lead-agent",
+      "what": "build the docs",
+      "since": "2026-10-03T10:22:40.000+07:00",
+      "until": null
+    }
+  ],
+  "checked_at": "2026-10-03T10:23:00+07:00"
+}

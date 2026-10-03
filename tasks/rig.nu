@@ -164,6 +164,10 @@ def main [
     skipped "always-on session: needs the login first"
   }
 
+  print "Reporting"
+
+  token-step
+
   if (dry-run) {
     print "rig: dry run finished. Nothing was changed."
   } else {

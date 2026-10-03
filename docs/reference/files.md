@@ -24,8 +24,11 @@ parent: Reference
 | `~/work/jobs/<claim id>/` | One job's folder, where Claude ran it; kept after the job | `fleet run`, through `tasks/claims.nu` |
 | `~/.local/state/claude-rig/claims/` | The machine's claims, one `<claim id>.json` each, and `.lock` for a fraction of a second while one is taken or let go ([Claims](../concepts/claims.md)) | `fleet run`, `fleet release` |
 | `~/.config/claude-rig/slots` | How many jobs the machine runs at once, if not one | `fleet slots` |
-| `~/.config/pitchfork/config.toml` | The session service, `[daemons.claude-rig]`; a first-time backup next to it (macOS, Linux) | the session step |
+| `~/.config/pitchfork/config.toml` | The session service, `[daemons.claude-rig]`, with an `on_stop` hook that reports `stop`; a first-time backup next to it (macOS, Linux) | the session step |
 | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\claude-rig.cmd` | Starts the session at sign-in (Windows) | the session step |
 | `~/.claude-rig-session.log` | What the server last printed (Windows) | the session |
 | `~/.config/claude-rig/machines.json` | The machine list, on the Mac you push from | `push`, `fleet add` |
 | `~/.config/claude-rig/config.toml` | `folder = "<path>"`: your config folder, on the Mac you push from | `config init` |
+| `~/.config/claude-rig/device-id` | The machine id in its reports: 16 random hex digits, made once | the first report |
+| `~/.config/claude-rig/fleet-api.token` | fleet-api's write token, readable by the user only (mode 600; on Windows, an access list with only the user) | `push`, or the run when `FLEET_API_WRITE_TOKEN` is set |
+| `~/.config/claude-rig/report-spool/` | Reports not yet delivered to fleet-api, one JSON file each, at most 288 | the session, `report` |

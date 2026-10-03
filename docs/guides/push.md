@@ -15,6 +15,13 @@ mise run push -- user@host               # rig it
 
 `push` works out the OS on the other end, sends your config folder (`mise run config` shows which; with none, nothing is sent and the config step there is skipped), and runs the published bootstrap there. The config travels over the same SSH connection, so the machine needs no access to where you keep it ([Your config](../concepts/config.md#where-a-run-finds-it)). A dry run sends nothing. Run from a terminal, it passes the terminal through, so the login step on the machine can ask you for the code. When it succeeds, the machine is added to your machine list and shows in `mise run fleet`.
 
+To have the machine report to fleet-api, set `FLEET_API_WRITE_TOKEN` where you run `push`: it is sent over the same connection, on stdin, and kept there readable by that user only ([Reporting](../concepts/reporting.md#the-write-token)). Without it, `push` says the machine will not report. A dry run sends no token.
+
+```sh
+# the token from the keychain, through fleet-api's fnox config (a clone of fleet-api next to this repo)
+FLEET_API_WRITE_TOKEN="$(cd ../fleet-api && fnox get WRITE_TOKEN)" mise run push -- user@host
+```
+
 | Flag | What it does |
 |---|---|
 | `--dry-run` | Changes nothing on the machine |
