@@ -43,8 +43,8 @@ def make-fake-claude [root: path] {
   }
 }
 
-def check [what: string, passed: bool] {
-  if not $passed { error make { msg: $"FAILED: ($what)" } }
+def check [what: string, passed: bool, seen?: any] {
+  if not $passed { error make { msg: $"FAILED: ($what)(if $seen != null { $"\n($seen | to nuon --indent 2)" } else { '' })" } }
   print $"    ok  ($what)"
 }
 
@@ -109,12 +109,12 @@ def test-release [root: path] {
 def test-job [root: path] {
   print "a job"
   let done = job $root 1 [--caller alice --label test]
-  check "it runs" ($done.exit_code == 0)
+  check "it runs" ($done.exit_code == 0) $done
   # Compared by name: the stand-in may print the folder in another spelling
   # (a resolved link on macOS, a short 8.3 name on Windows).
   let ran_in = $done.stdout | str trim
   let jobs = ls ($root | path join work jobs) | get name | each {|dir| $dir | path basename }
-  check "in its own folder under the work folder's jobs/" (($ran_in | path dirname | path basename) == "jobs" and ($ran_in | path basename) in $jobs)
+  check "in its own folder under the work folder's jobs/" (($ran_in | path dirname | path basename) == "jobs" and ($ran_in | path basename) in $jobs) $done
   check "and lets go of its claim when it ends" (held $root | is-empty)
 
   # A job that outlives its claim's first expiry (1 s) keeps it by renewing it.
@@ -122,8 +122,8 @@ def test-job [root: path] {
     {|| with-env {FAKE_SECONDS: "4"} { job $root 1 [--caller long --label long --ttl "1"] } }
     {|| sleep 2500ms; claims $root 1 [take --caller late] }
   ] | par-each --keep-order {|step| do $step }
-  check "a running job keeps its claim past the first expiry" ($both.1.exit_code == 6 and $both.1.stdout =~ "long")
-  check "and the job finished" ($both.0.exit_code == 0)
+  check "a running job keeps its claim past the first expiry" ($both.1.exit_code == 6 and $both.1.stdout =~ "long") $both
+  check "and the job finished" ($both.0.exit_code == 0) $both
   clear $root
 }
 
@@ -133,7 +133,7 @@ def test-wait [root: path] {
     {|| with-env {FAKE_SECONDS: "3"} { job $root 1 [--caller first --label first] } }
     {|| sleep 1sec; {started: (date now), result: (job $root 1 [--caller second --label second --wait])} }
   ] | par-each --keep-order {|step| do $step }
-  check "the second job waits, then runs" ($both.1.result.exit_code == 0)
+  check "the second job waits, then runs" ($both.1.result.exit_code == 0) $both
   check "the first job ran too" ($both.0.exit_code == 0)
   check "the two ran in different folders" (($both.0.stdout | str trim) != ($both.1.result.stdout | str trim))
   clear $root
