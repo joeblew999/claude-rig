@@ -37,6 +37,8 @@ A machine needs a write token to report. It is passed in when the machine is rig
 4. **Claims in the record:** a claim taken or released is posted, so the phone shows who holds which machine.
 5. **fleet-api as the fleet's message bus.** charter makes fleet-api reactive over SSE and WebSocket streams that survive deploys ("like a NATS server on Cloudflare", the owner, 3 Oct 2026). Each machine keeps one outbound stream open, so no machine needs inbound SSH and machines behind NAT or a firewall work the same. Machines publish their report, claims, job results and "waiting for login"; each subscribes to its own subject for commands: run this work, update the rig, refresh the login. `fleet run` and the [login inbox](login.md) then go through the bus and work from a phone; claims are held in the control plane as well as on the machine. SSH stays only for the first enrolment (`push`).
 
+6. **Repos in the control plane, beside machines.** The owner (3 Oct 2026): repos consume each other's APIs, SDKs, binaries and tasks, and "what a repo depends on" should be a proper product feature. Each repo's pins stay its single source (`mise.toml` tools and task includes, `go.mod`, `package.json`). A charter task in each repo's CI, on every push to main and every release, reports what the repo depends on and what it released; fleet-api derives the graph (who consumes what, at which version, who is behind) and publishes release and breaking-change events on the bus. Mechanical version bumps: Renovate, run once centrally on a schedule and woken by a producer's release, with one shared preset; each consumer's own `mise run check` proves the PR. Changes that need code: fleet-api makes a job for a Claude worker in the fleet ("update this consumer for that release"), which opens the pull request. Filed for charter's part as [charter#38](https://github.com/joeblew999/charter/issues/38).
+
 ## One source of truth
 
 Decided 3 Oct 2026 (the owner: "It's really all about SSOT … I am demanding this be a product"):
@@ -47,4 +49,5 @@ Decided 3 Oct 2026 (the owner: "It's really all about SSOT … I am demanding th
 | Talking to fleet-api | charter's generated client | never hand-writes HTTP or JSON for the API |
 | A machine's host facts, rig facts and claims | claude-rig, the one thing on every machine | one report and one device id per machine |
 | A Mac's VMs | the UTM keeper | hands them to claude-rig's report through a local file; does not post itself |
+| What a repo depends on | the repo's own pin files | a charter task reports them from CI; fleet-api only derives the graph |
 
