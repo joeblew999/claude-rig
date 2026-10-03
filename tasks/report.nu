@@ -2,9 +2,11 @@
 # report.nu — tell fleet-api what this machine is and how it is doing.
 #
 # Builds one device report (fleet-api's DeviceReport, schema 1) from
-# `doctor --json` and what nushell reads about the machine, and posts it with
-# the write token. The session posts `start`, `interval` every 5 minutes and
-# `stop`; run by hand it posts `once`.
+# `doctor --json`, what nushell reads about the machine and, where the VM
+# tool's keeper runs, the VMs it last wrote down; then posts it with the write
+# token through fleet-api.ts, which is fleet-api's generated TypeScript SDK
+# (it checks the report against fleet-api's schema first). The session posts
+# `start`, `interval` every 5 minutes and `stop`; run by hand it posts `once`.
 #
 # A report is put in the spool folder first and taken out when fleet-api has
 # it, so one that could not be delivered is sent with the next. With no write
@@ -16,6 +18,7 @@
 #   nu tasks/report.nu                   post a report now (reason once)
 #   nu tasks/report.nu --print           print the report, post nothing
 #   nu tasks/report.nu --doctor <file>   use this doctor --json output
+#   nu tasks/report.nu --check           build the report, check it against fleet-api's schema, post nothing
 #   nu tasks/report.nu --list [--json]   the fleet, as fleet-api has it
 
 use lib.nu *
@@ -24,17 +27,19 @@ use awake.nu [keeper-state linux-can-sleep]
 
 const HERE = path self .
 const SCHEMA = 1
-const URL = "https://fleet-api.gedw99.workers.dev"
+# fleet-api's generated TypeScript SDK, as the tool list (mise/claude-rig.toml)
+# installs it from fleet-api's release; the version is pinned there.
+const SDK_TOOL = "github:joeblew999/fleet-api"
 # The session reports this often, and promises it in next_s.
 export const EVERY_S = 300
 # At most this many reports wait in the spool: a day of them.
 const SPOOL_MAX = 288
 
-# --- Where things are kept --------------------------------------------------
+# A VM keeper's list is taken while it is this fresh: the keeper writes it
+# every 15 s.
+const VMS_FRESH_S = 120
 
-export def fleet-api-url []: nothing -> string {
-  $env.FLEET_API_URL? | default $URL | str trim | str trim --right --char "/"
-}
+# --- Where things are kept --------------------------------------------------
 
 # The machine id: 16 random hex digits, made once, kept here.
 export def device-id-file []: nothing -> path { rig-home | path join device-id }
@@ -44,6 +49,10 @@ export def token-file []: nothing -> path { rig-home | path join fleet-api.token
 
 # Reports not yet delivered, one file each.
 export def spool-dir []: nothing -> path { rig-home | path join report-spool }
+
+# The VMs on this machine, as the VM tool's keeper (irgo-winvm keeper) last
+# wrote them: {ts, vms}, vms in fleet-api's shape.
+export def vms-file []: nothing -> path { rig-home | path join vms.json }
 
 # The machine id, made the first time it is asked for.
 export def device-id []: nothing -> string {
@@ -478,6 +487,24 @@ def claims-section [facts: any] {
   {status: "ok", slots: ([$slots 64] | math min), held: $held} | compact --empty
 }
 
+# --- The VMs -------------------------------------------------------------------
+
+# The vms section: what the VM keeper last wrote, unknown when that is stale,
+# or null (left out) where no keeper has written one.
+export def vms-section [now: int] {
+  let text = read-text (vms-file)
+  if $text == null { return null }
+  let kept = try { $text | from json } catch { null }
+  if ($kept | describe) !~ '^record' { return (unknown "the VM keeper's file is not a JSON object") }
+  let vms = $kept.vms?
+  if ($vms | describe) !~ '^record' { return (unknown "the VM keeper's file has no vms") }
+  let age_s = ($now - ($kept.ts? | default 0)) // 1000
+  if $age_s > $VMS_FRESH_S and $vms.status? != "unknown" {
+    return (unknown $"the VM keeper last wrote its list ($age_s // 60) min ago")
+  }
+  $vms
+}
+
 # --- The report --------------------------------------------------------------
 
 # The report, from doctor's facts (null: run doctor) at this moment.
@@ -485,10 +512,11 @@ export def build-report [reason: string, --doctor: any, --command: string = "rep
   let from = if $doctor != null { {facts: $doctor, why: ""} } else { doctor-facts }
   let facts = $from.facts
   let power = power-sections
+  let now = ms (date now)
   let report = {
     schema: $SCHEMA
     id: (device-id)
-    ts: (ms (date now))
+    ts: $now
     reason: $reason
     next_s: (if $reason in [start change interval] { $EVERY_S } else { 0 })
     tool: {name: "claude-rig", version: ($facts.rig_commit? | default "unknown"), command: $command}
@@ -507,28 +535,54 @@ export def build-report [reason: string, --doctor: any, --command: string = "rep
   # still shows.
   let report = if $reason == "stop" and $report.rig.status == "ok" { $report | upsert rig.session_running false } else { $report }
   let claims = claims-section $facts
-  if $claims == null { $report } else { $report | insert claims $claims }
+  let report = if $claims == null { $report } else { $report | insert claims $claims }
+  let vms = vms-section $now
+  if $vms == null { $report } else { $report | insert vms $vms }
 }
 
 # --- Sending -----------------------------------------------------------------
+
+# Where fleet-api's SDK is: FLEET_API_SDK, else where mise installed it. Null
+# when it is not installed.
+def sdk-dir [] {
+  let given = $env.FLEET_API_SDK? | default "" | str trim
+  if $given != "" { return $given }
+  # A service starts with almost nothing on PATH: look where mise is put.
+  let path = $env.PATH ++ [(local-bin) /opt/homebrew/bin /usr/local/bin]
+  let found = with-env {PATH: $path} {
+    if (have mise) { ^mise where $SDK_TOOL | complete } else { {exit_code: 1, stdout: ""} }
+  }
+  if $found.exit_code != 0 { return null }
+  let root = $found.stdout | str trim
+  if ($root | path join index.ts | path exists) { return $root }
+  # mise strips an archive's single top folder; in case it did not.
+  let nested = try { ls $root | where type == dir | get name | where {|dir| $dir | path join index.ts | path exists } } catch { [] }
+  $nested | get 0?
+}
+
+# Run fleet-api.ts (fleet-api's SDK) with what it reads on stdin and these
+# settings. Its answer: {ok, answer} or {ok: false, retry, why}.
+export def fleet-api [command: string, settings: record = {}, --input: string = ""]: nothing -> record {
+  let script = $HERE | path join fleet-api.ts
+  let path = $env.PATH ++ [(local-bin) (mise-shims)]
+  let sdk = sdk-dir
+  let bun = with-env {PATH: $path} { which bun | get path.0? }
+  if $bun == null { return {ok: false, retry: true, why: "bun is not installed (the tool list has it)"} }
+  let result = with-env ({FLEET_API_SDK: ($sdk | default "")} | merge $settings) {
+    $input | ^$bun $script $command | complete
+  }
+  try { $result.stdout | from json } catch {
+    {ok: false, retry: true, why: $"fleet-api.ts failed: ($result.stderr | str trim | lines | last 1 | get 0? | default 'no output')"}
+  }
+}
 
 # Post one spooled report. keep: false when it is done with, delivered or
 # refused for good; true when it should be tried again later.
 def post-file [file: path, token: string]: nothing -> record {
   let body = open --raw $file | decode utf-8
-  let id = try { $body | from json | get id } catch { return {keep: false, why: "not a report"} }
-  let url = $"(fleet-api-url)/api/devices/($id)/reports"
-  let response = try {
-    http post --full --allow-errors --max-time 15sec --content-type application/json --headers [Authorization $"Bearer ($token)"] $url $body
-  } catch {|error|
-    return {keep: true, why: $"could not reach (fleet-api-url): ($error.msg)"}
-  }
-  let status = $response.status
-  if $status >= 200 and $status < 300 { return {keep: false, why: ""} }
-  if $status in [401 403] { return {keep: true, why: $"fleet-api refused the token \(($status))"} }
-  if $status in [408 429] or $status >= 500 { return {keep: true, why: $"fleet-api answered ($status)"} }
-  let detail = try { $response.body | get errors | each {|error| $"($error.location?) ($error.message?)" } | str join "; " } catch { "" }
-  {keep: false, why: $"fleet-api refused the report \(($status)) ($detail)"}
+  let answer = fleet-api report {FLEET_API_WRITE_TOKEN: $token} --input $body
+  if $answer.ok { return {keep: false, why: ""} }
+  {keep: $answer.retry, why: $answer.why}
 }
 
 # Send what is in the spool, oldest first, stopping at the first that has to
@@ -594,14 +648,9 @@ def list-fleet [as_json: bool] {
   if $bearer == null {
     fail report "no token to read fleet-api with: set FLEET_API_READ_TOKEN (or FLEET_API_WRITE_TOKEN)"
   }
-  let url = $"(fleet-api-url)/api/devices"
-  let response = try {
-    http get --full --allow-errors --max-time 15sec --headers [Authorization $"Bearer ($bearer)"] $url
-  } catch {|error|
-    fail report $"could not reach (fleet-api-url): ($error.msg)"
-  }
-  if $response.status != 200 { fail report $"fleet-api answered ($response.status)" }
-  let list = $response.body
+  let answer = fleet-api list {FLEET_API_READ_TOKEN: $bearer}
+  if not $answer.ok { fail report $answer.why }
+  let list = $answer.answer
   if $as_json {
     print ($list | to json --indent 2)
     return
@@ -632,6 +681,7 @@ def list-fleet [as_json: bool] {
 
 def main [
   --print           # Print the report and post nothing
+  --check           # Check the report against fleet-api's schema and post nothing
   --doctor: path    # Take doctor's facts from this file (doctor --json output) instead of running it
   --reason: string = "once"  # Why it is sent: once, start, interval, stop
   --list            # Print the fleet as fleet-api has it
@@ -646,6 +696,12 @@ def main [
   let report = build-report $reason --doctor $facts --command report
   if $print {
     print ($report | to json --indent 2)
+    return
+  }
+  if $check {
+    let answer = fleet-api check --input ($report | to json --raw)
+    if not $answer.ok { fail report $answer.why }
+    print $"report: ($report.reason) holds to fleet-api's schema"
     return
   }
   print $"report: ($report.reason) ((send-report $report))"

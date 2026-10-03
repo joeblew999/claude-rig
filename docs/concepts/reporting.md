@@ -11,6 +11,7 @@ Every rigged machine with a write token tells fleet-api, the fleet's control pla
 ```sh
 mise run report                 # post this machine's report now
 mise run report -- --print      # show the report, post nothing
+mise run report -- --check      # check the report against fleet-api's schema, post nothing
 mise run report -- --list       # the fleet as fleet-api has it (needs FLEET_API_READ_TOKEN)
 ```
 
@@ -29,7 +30,7 @@ The session ([Login and the session](login-and-session.md)) reports while it run
 
 ## What a machine reports
 
-One JSON object, fleet-api's `DeviceReport` (schema 1; every field's rule is in fleet-api's `api/device.go`). Built by `tasks/report.nu`, from `doctor --json` and what nushell reads without new tools.
+One JSON object, fleet-api's `DeviceReport` (schema 1; every field's rule is in fleet-api's `api/device.go`). Built by `tasks/report.nu`, from `doctor --json`, what nushell reads without new tools, and the VM keeper's list.
 
 | Section | From | Not read |
 |---|---|---|
@@ -40,12 +41,13 @@ One JSON object, fleet-api's `DeviceReport` (schema 1; every field's rule is in 
 | `keeper` | Whether the session's keep-awake is running now, from the process list | |
 | `rig` | `doctor --json`: rig commit, tools installed, Claude version, config applied, logged in, session running, work folder. Also `rig.login` (below) | |
 | `claims` | `doctor --json`'s `slots` and `claims`, when it has them | |
+| `vms` | `~/.config/claude-rig/vms.json`, which the VM tool's keeper (`irgo-winvm keeper`) writes every 15 s on a Mac with UTM: the VMs, their state, whose, kept running. Taken as written while under 2 minutes old; older, `unknown` with its age. No file: no `vms` section | Machines with no keeper |
 
 A section that could not be read says `unknown` and why, never a zero that looks like a measurement.
 
 ### The login (`rig.login`)
 
-For seeing a login run out before it does. fleet-api keeps fields it does not know as posted, so this needs no change there; it has no condition for it yet.
+For seeing a login run out before it does. It is part of fleet-api's contract (`rig.login`); fleet-api has no condition for it yet.
 
 | Field | From |
 |---|---|
@@ -63,6 +65,12 @@ Only that one number is taken out of the stored login; the rest of it, the token
 - **Claude's login.** No access or refresh token, and not the email or organisation `claude auth status` shows.
 
 The machine's name is sent as `host.name`. It is the name the machine has in the Claude app: the host name, or `RIG_NAME` ([Settings](../reference/settings.md)). If the host name contains your name, set `RIG_NAME`.
+
+## How it is sent
+
+`tasks/report.nu` builds the report; `tasks/fleet-api.ts` sends it, and holds no code of its own against fleet-api: it runs fleet-api's generated TypeScript SDK with bun. The SDK comes from fleet-api's release, installed by mise from the tool list (`github:joeblew999/fleet-api`, pinned in `mise/claude-rig.toml`). Before posting, the SDK checks the report against fleet-api's schema (types, enums, required fields); fleet-api checks the rest and answers 422. `--check` runs that check alone.
+
+This is the one program that reports for a machine. The VM keeper on a Mac does not post: it writes its list for this report to carry, so a machine is one device in fleet-api, with one id.
 
 ## The machine id
 
@@ -82,7 +90,7 @@ The token is never in this repo, the captured config, or a VM image. To read the
 
 ## A report that cannot be delivered
 
-Each report is written to the spool, `~/.config/claude-rig/report-spool/`, then the spool is sent oldest first. A report fleet-api took (or already had: the same id and time is a duplicate) leaves the spool. One it refused as invalid is dropped, with the reason in the session's log. One that could not be delivered (no network, fleet-api down, the token refused) stays and goes with the next. The spool keeps at most 288 reports, a day of them.
+Each report is written to the spool, `~/.config/claude-rig/report-spool/`, then the spool is sent oldest first. A report fleet-api took (or already had: the same id and time is a duplicate) leaves the spool. One the SDK or fleet-api refused as invalid is dropped, with the reason in the session's log. One that could not be delivered (no network, fleet-api down, the token refused, the SDK or bun not installed yet) stays and goes with the next. The spool keeps at most 288 reports, a day of them.
 
 ## Limits
 
