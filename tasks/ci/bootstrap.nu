@@ -86,6 +86,12 @@ def main [
 # it, when the dry run must go all the way through the rig and say what it
 # would do. mise keeps its own folders, so the nushell the first run installed
 # is found and the rig itself runs.
+#
+# On Windows nushell takes its home from the user's profile folder, not from
+# HOME or USERPROFILE, so there the dry run sees the throwaway through the
+# rig's own settings for its folders (docs/reference/settings.md). The real
+# home is the rigged one; what a dry run would make there is checked by the
+# second run above.
 def dry-run-on-bare-home [] {
   let dirs = ^mise doctor --json | from json | get dirs
   let home = mktemp --directory --tmpdir claude-rig-home.XXXXXX
@@ -94,12 +100,15 @@ def dry-run-on-bare-home [] {
     USERPROFILE: $home
     XDG_CONFIG_HOME: ($home | path join .config)
     MISE_CONFIG_DIR: ($home | path join .config mise)
+    CLAUDE_HOME: ($home | path join .claude)
+    RIG_CONFIG_HOME: ($home | path join .config claude-rig)
+    RIG_WORKDIR: ($home | path join work)
     MISE_DATA_DIR: $dirs.data
     MISE_CACHE_DIR: $dirs.cache
     MISE_STATE_DIR: $dirs.state
   }
   do {
-    hide-env --ignore-errors RIG_CONFIG CLAUDE_HOME RIG_CONFIG_HOME RIG_ASSUME_LOGGED_IN
+    hide-env --ignore-errors RIG_CONFIG RIG_ASSUME_LOGGED_IN
     # As on a machine without mise: the bootstrap stops at what it would install. Not on
     # Windows, where bootstrap.ps1 reads PATH back from the registry and so finds mise.
     if not (is-windows) {
@@ -109,10 +118,14 @@ def dry-run-on-bare-home [] {
     }
     with-env $bare {
       let seen = ^$nu.current-exe --no-config-file --commands '$nu.home-dir' | str trim
-      check $"nushell takes its home from the throwaway \(($seen))" (($seen | path expand) == ($home | path expand))
+      if not (is-windows) {
+        check $"nushell takes its home from the throwaway \(($seen))" (($seen | path expand) == ($home | path expand))
+      }
       let output = bootstrap --dry-run
       check "the rig itself ran" ($output =~ 'rig: dry run finished')
-      check "it says what a run would do" ($output | lines | any {|line| $line =~ '^ +would ' })
+      let would = $output | lines | where {|line| $line =~ '^ +would ' }
+      check "it says what a run would do" ($would | is-not-empty)
+      check "it would make things in the throwaway home" ($would | any {|line| $line | str contains ($home | path basename) })
     }
   }
   for made in $RIG_MAKES {
