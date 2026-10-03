@@ -182,7 +182,8 @@ def test-git-url [root: path] {
   ^git ...$git commit -q -am "change it"
   let later = run-task $APPLY $home $rig_home []
   check "a later run without RIG_CONFIG brings the clone up to date" ($later.exit_code == 0 and $later.stdout =~ "update the config from")
-  check "and applies the change" ((open --raw ($home | path join CLAUDE.md)) == "# A changed config\n")
+  # git on Windows may check text out with CRLF line endings.
+  check "and applies the change" ((open --raw ($home | path join CLAUDE.md) | str replace --all "\r" "") == "# A changed config\n")
 }
 
 def main [] {
