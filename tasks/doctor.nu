@@ -10,6 +10,7 @@
 use lib.nu *
 use enroll.nu [logged-in session-running]
 use userconfig.nu [describe-config]
+use claims.nu [live-claims slot-count]
 
 # The first line a program prints, or null if it is missing or fails.
 def first-line [program: string, args: list<string>] {
@@ -40,6 +41,8 @@ def report []: nothing -> record {
     logged_in: (logged-in)
     session_running: (session-running)
     work_dir: (work-dir)
+    slots: (slot-count)
+    claims: (live-claims | select id who what since until)
     checked_at: (date now | format date "%Y-%m-%dT%H:%M:%S%:z")
   }
 }
@@ -53,9 +56,11 @@ def main [
     return
   }
   print "This machine"
-  $facts | transpose key value | each {|row|
+  $facts | reject claims | transpose key value | each {|row|
     print $"  ($row.key | fill --width 16) ($row.value)"
   }
+  let held = if ($facts.claims | is-empty) { "none" } else { $facts.claims | each {|claim| $"($claim.who) \(($claim.what)) since ($claim.since)" } | str join "; " }
+  print $"  ('claims' | fill --width 16) ($held)"
   print ""
   print "What a run would change"
   ^$nu.current-exe ($env.FILE_PWD | path join rig.nu) --dry-run

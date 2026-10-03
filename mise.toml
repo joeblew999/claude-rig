@@ -43,8 +43,8 @@ description = "Rig a remote machine over SSH: mise run push user@host. Pass --dr
 run = "nu tasks/push.nu"
 
 [tasks.test]
-description = "Run the tests: the config merge, the capture checks, and where the config comes from, against throwaway folders"
-run = ["nu tests/apply.nu", "nu tests/capture.nu", "nu tests/config.nu"]
+description = "Run the tests: the config merge, the capture checks, where the config comes from, and the claims, against throwaway folders"
+run = ["nu tests/apply.nu", "nu tests/capture.nu", "nu tests/config.nu", "nu tests/claims.nu"]
 
 [tasks."plugin:check"]
 description = "Check the Claude Code plugin in plugin/ and the marketplace file with Claude Code's own validator (needs claude)"

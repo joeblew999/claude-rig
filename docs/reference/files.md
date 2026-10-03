@@ -21,6 +21,9 @@ parent: Reference
 | `~/.claude.rig-backup-<date>/` | The backup before the first change | the run, once |
 | `~/.claude.json` | Only the work folder's approval | the session step |
 | `~/work/` | The work folder | the session step |
+| `~/work/jobs/<claim id>/` | One job's folder, where Claude ran it; kept after the job | `fleet run`, through `tasks/claims.nu` |
+| `~/.local/state/claude-rig/claims/` | The machine's claims, one `<claim id>.json` each, and `.lock` for a fraction of a second while one is taken or let go ([Claims](../concepts/claims.md)) | `fleet run`, `fleet release` |
+| `~/.config/claude-rig/slots` | How many jobs the machine runs at once, if not one | `fleet slots` |
 | `~/.config/pitchfork/config.toml` | The session service, `[daemons.claude-rig]`; a first-time backup next to it (macOS, Linux) | the session step |
 | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\claude-rig.cmd` | Starts the session at sign-in (Windows) | the session step |
 | `~/.claude-rig-session.log` | What the server last printed (Windows) | the session |
