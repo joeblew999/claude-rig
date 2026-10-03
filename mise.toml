@@ -1,6 +1,8 @@
 [tools]
 nu = "0.116.0"
 shellcheck = "latest"
+# charter writes and checks the docs site the same way in every repo of the owner's.
+"github:joeblew999/charter" = "0.9.0"
 
 [tasks.rig]
 description = "Rig this machine: tools, Claude Code, Claude config. Pass --dry-run to only look."
@@ -40,3 +42,26 @@ run = [
   "shellcheck bootstrap.sh",
   "nu --commands 'for f in (glob tasks/*.nu | append (glob tests/*.nu)) { nu-check --debug $f }'",
 ]
+
+# ---- docs: the docs site in docs/, kept the way charter keeps it ----
+
+[tasks."docs:setup"]
+description = "Write the docs site's config, docs/writing.md and docs/llms.txt (the same for every repo that uses charter)"
+run = "charter docs"
+
+[tasks."docs:lint"]
+description = "Check docs/ for what a program can check: front matter, links, the index, tasks and paths that don't exist"
+run = "charter docs-lint"
+
+[tasks."docs:check"]
+description = "docs:lint, and fail if the generated docs files are stale"
+run = "charter docs -check && charter docs-lint"
+
+[tasks."docs:review"]
+description = "Have Claude bring docs/ up to date and into line with docs/writing.md"
+run = "charter docs-review"
+
+[tasks."docs:pages"]
+description = "REMOTE, once per repo: turn on GitHub Pages for docs/ on main"
+run = 'gh api -X POST "repos/{owner}/{repo}/pages" -f "source[branch]=main" -f "source[path]=/docs"'
+
