@@ -1,0 +1,13 @@
+{
+  "name": "rig",
+  "displayName": "claude-rig",
+  "description": "Rig a machine over SSH, make a VM, see the fleet and give it work, from inside Claude Code. The commands run claude-rig's tasks in ~/.claude-rig.",
+  "author": {
+    "name": "joeblew999",
+    "url": "https://github.com/joeblew999"
+  },
+  "homepage": "https://joeblew999.github.io/claude-rig/guides/plugin.html",
+  "repository": "https://github.com/joeblew999/claude-rig",
+  "license": "MIT",
+  "keywords": ["fleet", "ssh", "remote-control", "vm", "mise"]
+}

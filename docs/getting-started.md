@@ -7,6 +7,8 @@ nav_order: 2
 
 One tutorial for a Mac or a Linux machine. You end with the machine in the Claude app, ready for work from your phone. For Windows: [Rig a Windows PC](guides/windows.md). To do it from your Mac to another machine: [Rig a machine over SSH](guides/push.md).
 
+Using Claude Code? The easy start is the plugin: two commands install it, and `/rig:setup` does the steps below for you, asking first ([Use it from Claude Code](guides/plugin.md)).
+
 You need a terminal on the machine, internet access, and a Claude subscription (Pro, Max, Team or Enterprise). On Linux, an account that can use `sudo`.
 
 ## 1. Look first

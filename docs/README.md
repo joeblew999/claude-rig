@@ -30,6 +30,7 @@ Start with [Getting started](getting-started.md).
 | The tool list | `mise/claude-rig.toml` | The tools every machine gets, at the same versions |
 | The session | `tasks/session.nu` | The always-on `claude remote-control` that puts a machine in the Claude app ([Login and the session](concepts/login-and-session.md)) |
 | The machine list | `~/.config/claude-rig/machines.json`, on your Mac only | The machines rigged from here, for `fleet` |
+| The plugin | `plugin/`, listed by `.claude-plugin/marketplace.json` | The Claude Code plugin `rig`: commands that run the tasks from inside Claude ([Use it from Claude Code](guides/plugin.md)) |
 | The work folder | `~/work` on each machine | Where the session runs; work you send runs in a job folder under it, `~/work/jobs/<claim id>` |
 | A claim | `~/.local/state/claude-rig/claims/` on each machine | A record that one caller is using one of the machine's slots ([Claims](concepts/claims.md)) |
 | A task | `mise run <task>` | Every command ([Tasks](reference/tasks.md)) |
@@ -48,9 +49,9 @@ Never edit these: change the source and run the task.
 | Section | Pages |
 |---|---|
 | Start | [Getting started](getting-started.md) |
-| [Guides](guides.md) | [Rig a Windows PC](guides/windows.md), [Rig a machine over SSH](guides/push.md), [Make a VM worker](guides/vm.md), [See and steer the fleet](guides/fleet.md), [Change the config everywhere](guides/capture.md), [Take a machine out](guides/unrig.md) |
+| [Guides](guides.md) | [Use it from Claude Code](guides/plugin.md), [Rig a Windows PC](guides/windows.md), [Rig a machine over SSH](guides/push.md), [Make a VM worker](guides/vm.md), [See and steer the fleet](guides/fleet.md), [Change the config everywhere](guides/capture.md), [Take a machine out](guides/unrig.md) |
 | [Concepts](concepts.md) | [A run](concepts/a-run.md), [Login and the session](concepts/login-and-session.md), [Your config](concepts/config.md), [Claims](concepts/claims.md) |
-| [Reference](reference.md) | [Tasks](reference/tasks.md), [Settings](reference/settings.md), [What the rig writes on a machine](reference/files.md) |
-| [This repository](contributing.md) | [Rules](rules.md), [Findings](findings.md), [Plans](plans.md) ([Backlog](plans/backlog.md), [How the repos fit](plans/how-the-repos-fit.md), [Adoption](plans/adoption.md)), [Writing docs](writing.md) |
+| [Reference](reference.md) | [Tasks](reference/tasks.md), [Settings](reference/settings.md), [What the rig writes on a machine](reference/files.md), [Plugin commands](reference/plugin.md) |
+| [This repository](contributing.md) | [Rules](rules.md), [Findings](findings.md), [Plans](plans.md) ([Backlog](plans/backlog.md), [How the repos fit](plans/how-the-repos-fit.md), [Adoption](plans/adoption.md), [Control plane](plans/control-plane.md)), [Writing docs](writing.md) |
 
 For an agent: [llms.txt](https://joeblew999.github.io/claude-rig/llms.txt) lists every page as Markdown.

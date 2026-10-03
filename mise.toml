@@ -42,6 +42,10 @@ run = "nu tasks/push.nu"
 description = "Run the tests: the config merge, the capture checks and the claims, against throwaway folders"
 run = ["nu tests/apply.nu", "nu tests/capture.nu", "nu tests/claims.nu"]
 
+[tasks."plugin:check"]
+description = "Check the Claude Code plugin in plugin/ and the marketplace file with Claude Code's own validator (needs claude)"
+run = ["claude plugin validate .", "claude plugin validate plugin"]
+
 [tasks.lint]
 description = "Check the scripts"
 run = [

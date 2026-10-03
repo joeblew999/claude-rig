@@ -19,6 +19,7 @@ Run as `mise run <task>`; flags go after `--` (`mise run doctor -- --json`).
 | `capture` | | Copies your Mac's `~/.claude` into `claude/` ([guide](../guides/capture.md)) |
 | `apply` | `--dry-run` | The config step of a run on its own |
 | `test` | | The tests, against throwaway folders |
+| `plugin:check` | | Claude Code's validator on the marketplace file and the plugin ([Plugin commands](plugin.md)); needs `claude` |
 | `lint` | | shellcheck on `bootstrap.sh`, and nushell's checker on every task and test |
 | `docs:setup` | | Writes the docs site's config, `docs/writing.md` and `docs/llms.txt` |
 | `docs:lint`, `docs:check` | | Checks `docs/`; `docs:check` also fails if the generated files are stale |
