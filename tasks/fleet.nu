@@ -11,6 +11,9 @@
 #   nu tasks/fleet.nu forget user@host
 #   nu tasks/fleet.nu run <machine> "<work>"   give one machine a piece of work
 #   nu tasks/fleet.nu run --all "<work>"       give every machine the same work
+#   nu tasks/fleet.nu claims <machine>         who is using a machine
+#   nu tasks/fleet.nu release <machine> <id>   let go of a claim on it
+#   nu tasks/fleet.nu slots <machine> [<n>]    how many jobs it takes at once
 
 use lib.nu *
 use remote.nu *
@@ -81,85 +84,170 @@ def "main forget" [target: string] {
   }
 }
 
-# The command that runs one piece of work with Claude on a machine, in its
-# work folder, and prints Claude's answer. The work itself is never put on a
-# command line, where quoting would mangle it: on macOS and Linux it goes in
-# on stdin, and on Windows it rides inside the script as base64.
-def work-on [os: string, work: string]: nothing -> record {
-  if $os == "Windows" {
-    let encoded = $work | encode base64
-    {
-      command: "powershell -NoProfile -ExecutionPolicy Bypass -Command -"
-      input: ([
-        $"$work = [Text.Encoding]::UTF8.GetString\([Convert]::FromBase64String\('($encoded)'))"
-        '$env:Path = "$HOME\.local\bin;$env:LOCALAPPDATA\mise\shims;$env:Path"'
-        'New-Item -ItemType Directory -Force "$HOME\work" | Out-Null; Set-Location "$HOME\work"'
-        '$work | claude -p'
-      ] | str join "\n")
+# A word that is safe on any remote command line once in single quotes:
+# callers and job labels are cut down to plain characters.
+def plain [text: string, longest: int]: nothing -> string {
+  $text | str replace --all --regex '[^A-Za-z0-9@._:/+= -]' "_" | str trim | str substring 0..<($longest)
+}
+
+# The command that runs tasks/claims.nu on a machine, with `input` on its
+# stdin, and its output captured. Every argument has been through `plain`.
+# The input (the work) is never put on a command line, where quoting would
+# mangle it: on macOS and Linux it goes in on stdin, and on Windows it rides
+# inside the PowerShell script as base64.
+def claims-on [machine: record, args: list<string>, input?: string]: nothing -> record {
+  if $machine.target == "(this machine)" {
+    let claims = $env.FILE_PWD | path join claims.nu
+    if $input == null {
+      return (^$nu.current-exe $claims ...$args | complete)
     }
+    return ($input | ^$nu.current-exe --stdin $claims ...$args | complete)
+  }
+  let quoted = $args | each {|arg| $"'($arg)'" } | str join " "
+  let options = ssh-options ($machine.port? | default null) ($machine.identity? | default null) ($machine.known_hosts? | default null)
+  if $machine.os == "Windows" {
+    let claims = '& "$env:LOCALAPPDATA\mise\shims\nu.exe" --stdin "$HOME\.claude-rig\tasks\claims.nu" ' + $quoted
+    let script = [
+      '$OutputEncoding = [Text.Encoding]::UTF8'
+      '$env:Path = "$HOME\.local\bin;$env:LOCALAPPDATA\mise\shims;$env:Path"'
+      (if $input == null {
+        "'' | " + $claims
+      } else {
+        "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + ($input | encode base64) + "')) | " + $claims
+      })
+      'exit $LASTEXITCODE'
+    ] | str join "\n"
+    $script | ^ssh -o BatchMode=yes ...$options $machine.target "powershell -NoProfile -ExecutionPolicy Bypass -Command -" | complete
   } else {
-    {
-      command: 'mkdir -p "$HOME/work" && cd "$HOME/work" && PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH" claude -p'
-      input: $work
+    let command = $'PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH" nu --stdin "$HOME/.claude-rig/tasks/claims.nu" ($quoted)'
+    if $input == null {
+      ^ssh -n -o BatchMode=yes ...$options $machine.target $command | complete
+    } else {
+      $input | ^ssh -o BatchMode=yes ...$options $machine.target $command | complete
     }
   }
 }
 
-# Give one machine the work and wait for the answer.
-def run-on [machine: record, work: string]: nothing -> record {
+# Who is calling: --caller, else $env.RIG_CALLER, else user@host.
+def caller-name [given: any]: nothing -> string {
+  let user = $env.USER? | default ($env.USERNAME? | default "someone")
+  plain ($given | default ($env.RIG_CALLER? | default $"($user)@(machine-name)")) 60
+}
+
+# Give one machine the work and wait for the answer. The machine takes a
+# claim first and runs the work in that claim's own job folder.
+def run-on [machine: record, work: string, caller: string, label: string, wait: bool]: nothing -> record {
   let started = date now
-  let result = if $machine.target == "(this machine)" {
-    cd (work-dir)
-    $work | ^claude -p | complete
-  } else {
-    let options = ssh-options ($machine.port? | default null) ($machine.identity? | default null) ($machine.known_hosts? | default null)
-    let how = work-on $machine.os $work
-    $how.input | ^ssh -o BatchMode=yes ...$options $machine.target $how.command | complete
-  }
+  let args = [job --caller $caller --label $label] ++ (if $wait { [--wait] } else { [] })
+  let result = claims-on $machine $args $work
+  let state = if $result.exit_code == 0 { "done" } else if $result.exit_code == 6 { "busy" } else { "failed" }
   {
     machine: $machine.target
     ok: ($result.exit_code == 0)
+    state: $state
     seconds: ((date now) - $started | into int | $in / 1_000_000_000 | math round --precision 1)
-    answer: (if $result.exit_code == 0 { $result.stdout | str trim } else { $"($result.stdout | str trim)\n($result.stderr | str trim)" | str trim })
+    answer: (if $result.exit_code in [0 6] { $result.stdout | str trim } else { $"($result.stdout | str trim)\n($result.stderr | str trim)" | str trim })
   }
 }
 
-# Give a machine a piece of work: Claude runs it there, in the machine's work
-# folder, with that machine's settings, and the answer comes back here. With
-# --all, every machine gets the same work at the same time.
+# Every machine: this one, then each one rigged from here.
+def all-machines []: nothing -> list<record> {
+  [{target: "(this machine)", os: "here"}] ++ (known-machines)
+}
+
+# One machine, by its `where` from the table, or this machine by its name.
+def find-machine [wanted: string]: nothing -> record {
+  let found = all-machines | where {|machine| $machine.target == $wanted or ($wanted == (machine-name) and $machine.target == "(this machine)") }
+  if ($found | is-empty) { fail fleet $"no machine called ($wanted). `mise run fleet` lists them by their `where`." }
+  $found.0
+}
+
+# Give a machine a piece of work: Claude runs it there, with that machine's
+# settings, and the answer comes back here. The machine first takes a claim,
+# so the work gets its own job folder and nobody else's job runs there at
+# the same time. A busy machine says who holds it, unless --wait is given.
+# With --all, every machine gets the same work at the same time, and busy
+# ones are reported as busy.
 #
 # This is how a lead Claude spreads work over the fleet: one call per piece
 # of work, each to a different machine.
 def "main run" [
   ...words: string  # The machine (a name from the fleet table, or user@host), then the work. With --all, only the work
   --all             # Every machine, this one included
+  --wait            # Wait for a busy machine to have a free slot (not with --all)
+  --caller: string  # Who is giving the work (default: $RIG_CALLER, else user@host)
+  --label: string   # What the job is, in a few words (default: the start of the work)
   --json            # Print the results as JSON
 ] {
-  let here = {target: "(this machine)", os: "here"}
-  let machines = [$here] ++ (known-machines)
   let chosen = if $all {
-    $machines
+    all-machines
   } else {
     if ($words | length) < 2 { fail fleet "say which machine, then the work. Or use --all." }
-    let wanted = $words.0
-    let found = $machines | where {|machine| $machine.target == $wanted or ($wanted == (machine-name) and $machine.target == "(this machine)") }
-    if ($found | is-empty) { fail fleet $"no machine called ($wanted). `mise run fleet` lists them by their `where`." }
-    $found
+    [(find-machine $words.0)]
   }
   let work = (if $all { $words } else { $words | skip 1 }) | str join " "
   if ($work | str trim) == "" { fail fleet "there is no work to give." }
+  let who = caller-name $caller
+  let what = plain ($label | default ($work | lines | get 0? | default "work")) 40
+  let wait = $wait and not $all
 
-  let results = $chosen | par-each {|machine| run-on $machine $work }
+  let results = $chosen | par-each {|machine| run-on $machine $work $who $what $wait }
   if $json {
     print ($results | to json --indent 2)
   } else {
     for result in $results {
-      let state = if $result.ok { "done" } else { "FAILED" }
-      print $"--- ($result.machine): ($state) in ($result.seconds)s"
+      print $"--- ($result.machine): ($result.state | str uppercase) in ($result.seconds)s"
       print $result.answer
     }
   }
-  if ($results | any {|result| not $result.ok }) { exit 1 }
+  if ($results | any {|result| $result.state == "failed" }) { exit 1 }
+  if ($results | any {|result| $result.state == "busy" }) { exit 6 }
+}
+
+# Run a claims command on one machine and pass on what it said.
+def claims-command [wanted: string, args: list<string>] {
+  let result = claims-on (find-machine $wanted) $args
+  if ($result.stdout | str trim) != "" { print ($result.stdout | str trim) }
+  if ($result.stderr | str trim) != "" { print --stderr ($result.stderr | str trim) }
+  if $result.exit_code != 0 { exit $result.exit_code }
+}
+
+# The claims on one machine: who is using it, for which job, until when.
+def "main claims" [
+  machine: string  # The machine (a name from the fleet table, or user@host)
+  --json           # Print them as JSON
+] {
+  claims-command $machine (if $json { [list --json] } else { [list] })
+}
+
+# Let go of a claim on one machine. Someone else's live claim needs --force;
+# the work it was taken for is not stopped.
+def "main release" [
+  machine: string   # The machine (a name from the fleet table, or user@host)
+  id: string        # The claim's id, from `fleet claims`
+  --force           # Release it even though it is someone else's and still live
+  --caller: string  # Who is releasing it (default: $RIG_CALLER, else user@host)
+] {
+  claims-command $machine ([release (plain $id 40) --caller (caller-name $caller)] ++ (if $force { [--force] } else { [] }))
+}
+
+# How many jobs one machine takes at once. With a number, set it.
+def "main slots" [
+  machine: string  # The machine (a name from the fleet table, or user@host)
+  count?: int      # The new number of slots
+] {
+  claims-command $machine (if $count == null { [slots] } else { [slots ($count | into string)] })
+}
+
+# Who holds a machine, for the table: "free", or who and since when.
+def claims-text [report: record]: nothing -> string {
+  let claims = $report.claims? | default null
+  if $claims == null { return "?" }
+  if ($claims | is-empty) { return "free" }
+  let since = {|claim| try { $claim.since | into datetime | format date "%H:%M" } catch { "?" } }
+  let held = $claims | each {|claim| $"($claim.who) since (do $since $claim)" } | str join ", "
+  let slots = $report.slots? | default 1
+  if $slots > 1 { $"($claims | length)/($slots): ($held)" } else { $held }
 }
 
 def main [
@@ -178,6 +266,7 @@ def main [
       tools: (yes-no ($report.tools_installed? | default null))
       "logged in": (yes-no ($report.logged_in? | default null))
       session: (yes-no ($report.session_running? | default null))
+      claims: (claims-text $report)
       rig: ($report.rig_commit? | default "?")
       note: ($report.problem? | default "")
     }

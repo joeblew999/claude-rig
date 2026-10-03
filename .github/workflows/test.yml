@@ -53,6 +53,7 @@ jobs:
           export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
           nu tests/apply.nu
           nu tests/capture.nu
+          nu tests/claims.nu
 
       - name: Doctor reports this machine
         run: |
@@ -106,6 +107,8 @@ jobs:
           nu tests\apply.nu
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
           nu tests\capture.nu
+          if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
+          nu tests\claims.nu
           if ($LASTEXITCODE -ne 0) { throw 'the tests failed' }
 
       - name: Doctor reports this machine
