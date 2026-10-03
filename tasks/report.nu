@@ -77,7 +77,9 @@ export def save-token [token: string] {
   # Made empty and locked down first, so the token is never in a file others can read.
   "" | save --force $file
   if (is-windows) {
-    ^icacls $file /inheritance:r /grant:r $"($env.USERNAME):F" | complete | ignore
+    # A file made by an administrator also names Administrators and SYSTEM
+    # outright, so those go as well as what it inherits.
+    ^icacls $file /inheritance:r /grant:r $"($env.USERNAME):F" /remove:g "*S-1-5-32-544" "*S-1-5-18" | complete | ignore
   } else {
     ^chmod 600 $file
   }
@@ -96,7 +98,7 @@ export def token-windows-script [token: string]: nothing -> string {
     "New-Item -ItemType Directory -Force -Path $dir | Out-Null"
     "$file = Join-Path $dir 'fleet-api.token'"
     "Set-Content -Path $file -Value '' -NoNewline"
-    "icacls $file /inheritance:r /grant:r ($env:USERNAME + ':F') | Out-Null"
+    "icacls $file /inheritance:r /grant:r ($env:USERNAME + ':F') /remove:g '*S-1-5-32-544' '*S-1-5-18' | Out-Null"
     "if ($LASTEXITCODE -ne 0) { exit 1 }"
     $"Set-Content -Path $file -Value '($token)' -NoNewline -Encoding ascii"
     ""

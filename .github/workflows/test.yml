@@ -279,7 +279,7 @@ jobs:
           if ((Get-Content $token -Raw) -ne 'ci-made-up-token') { throw 'the token was not kept' }
           $acl = icacls $token | Out-String
           $acl
-          if ($acl -match 'Everyone|BUILTIN\\Users|Authenticated Users') { throw 'others can read the token' }
+          if ($acl -match 'Everyone|BUILTIN\\|Authenticated Users|NT AUTHORITY') { throw 'others can read the token' }
 
       - name: Claude Code and config are in place
         run: |

@@ -233,7 +233,8 @@ def test-token-file [root: path] {
   check "and never prints it" (not ($first.stdout | str contains "test-token-1"))
   if $nu.os-info.name == "windows" {
     let acl = ^icacls $file | complete | get stdout
-    check "the file is closed to everyone but the user" ($acl =~ $env.USERNAME and $acl !~ '(?i)(Everyone|BUILTIN\\Users|Authenticated Users)')
+    print ($acl | lines | where {|line| $line =~ ':' } | str join "\n")
+    check "the file is closed to everyone but the user" ($acl =~ $env.USERNAME and $acl !~ '(?i)(Everyone|BUILTIN\\|Authenticated Users|NT AUTHORITY)')
   } else {
     check "the file is readable by the user only" ((ls -l $file | get 0.mode) == "rw-------")
   }
