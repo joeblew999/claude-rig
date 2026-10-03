@@ -62,7 +62,7 @@ The [plugin](plugin.md) brings the skill `claude-rig-fleet`, so Claude knows the
 
 ## Limits
 
-- **One piece of work per machine per call.** Splitting a job into pieces and choosing machines for them is not built ([Backlog](../plans/backlog.md)).
+- **One piece of work per machine per call.** Splitting a job into pieces and choosing machines for them is not built.
 - **Only machines your Mac can reach.** The table is built by asking each machine over SSH.
 - **A machine must run the rig at a commit with claims** (`tasks/claims.nu`). One rigged earlier fails `fleet run`; push to it again. Its `claims` column shows `?`.
 - **Not tested:** an answer coming back from a machine other than the Mac, and Windows: both wait on a second machine being logged in. Claims over SSH are not tested either; on the Mac and in CI they are.

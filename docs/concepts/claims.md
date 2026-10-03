@@ -30,7 +30,7 @@ The machine is the one place every caller has to reach to give it work, so it is
 - **Is instant and works offline.** Taking one is a few file operations on the machine; nothing else needs to be up.
 - **Covers every caller,** whether the work came from your Mac, another Mac, or a session on the machine itself, as long as it goes through the rig's claims.
 
-A shared record of claims across machines, so one place can show who used which machine and when, is planned ([Control plane](../plans/control-plane.md)). It will record what the machines decide; it will not decide anything.
+A shared record of claims across machines, so one place can show who used which machine and when, is planned ([fleet-api#8](https://github.com/joeblew999/fleet-api/issues/8)). It will record what the machines decide; it will not decide anything.
 
 ## How two callers cannot both get the last slot
 
