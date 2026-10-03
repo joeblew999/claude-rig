@@ -4,7 +4,12 @@
 # Connects with the system ssh, works out which OS is on the other end, and
 # runs the published one-line bootstrap there: bootstrap.sh on macOS and
 # Linux, bootstrap.ps1 on Windows. The remote output is shown as it happens.
-# Safe to repeat, because the bootstrap is. No tokens are sent.
+# Safe to repeat, because the bootstrap is.
+#
+# The one token sent is fleet-api's write token, when FLEET_API_WRITE_TOKEN is
+# set here: over the same SSH connection, on stdin (never on a command line),
+# into ~/.config/claude-rig/fleet-api.token, readable by that user only. The
+# remote's session reports with it. Without it, the remote does not report.
 #
 # If this machine has a config folder (`mise run config`), it is packed, checked
 # for secrets, and copied over the same SSH connection to
@@ -23,6 +28,7 @@
 use lib.nu *
 use remote.nu *
 use userconfig.nu [local-folder pack-for-push REMOTE_DIR REMOTE_SENT_FILE settings-file]
+use report.nu [TOKEN_UNIX_COMMAND token-windows-script]
 
 const RAW = "https://raw.githubusercontent.com/joeblew999/claude-rig"
 
@@ -105,6 +111,16 @@ def send-config [options: list<string>, scp: list<string>, target: string, os: s
   if $sent.exit_code != 0 { fail push $"could not send the config to ($target): ($sent.stderr | str trim)" }
 }
 
+# Send fleet-api's write token to the remote, on stdin. Stops if it cannot.
+def send-token [options: list<string>, target: string, os: string, token: string] {
+  let sent = if $os == "Windows" {
+    token-windows-script $token | ^ssh -T -o BatchMode=yes ...$options $target "powershell -NoProfile -Command -" | complete
+  } else {
+    $token | ^ssh -T -o BatchMode=yes ...$options $target $TOKEN_UNIX_COMMAND | complete
+  }
+  if $sent.exit_code != 0 { fail push $"could not send the fleet-api write token to ($target): ($sent.stderr | str trim)" }
+}
+
 # Run the bootstrap on the remote, showing its output live. Returns its exit code.
 def run-remote [options: list<string>, target: string, command: string, script: any]: nothing -> int {
   let options = [-o ServerAliveInterval=30] ++ $options
@@ -166,6 +182,18 @@ def main [
   } else {
     send-config $options (scp-options $port $identity $known_hosts) $target $os $config
     print $"push: sent the config in ($config)"
+  }
+
+  let token = $env.FLEET_API_WRITE_TOKEN? | default "" | str trim
+  if $token == "" {
+    print $"push: no FLEET_API_WRITE_TOKEN here, so ($target) will not report to fleet-api"
+  } else if $token !~ '^[A-Za-z0-9._~+/=-]+$' {
+    fail push "FLEET_API_WRITE_TOKEN has characters a token does not have."
+  } else if $dry_run {
+    print "push: a real run sends the fleet-api write token; this dry run sends nothing"
+  } else {
+    send-token $options $target $os $token
+    print "push: sent the fleet-api write token"
   }
 
   let code = if $os == "Windows" {

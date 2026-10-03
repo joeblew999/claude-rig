@@ -18,6 +18,10 @@ run = "nu tasks/doctor.nu"
 description = "Every rigged machine in one table: this one and each machine rigged from here with push."
 run = "nu tasks/fleet.nu"
 
+[tasks.report]
+description = "Post this machine's report to fleet-api now. --print shows it and posts nothing; --list shows the fleet as fleet-api has it."
+run = "nu tasks/report.nu"
+
 [tasks.vm]
 description = "A UTM VM on this Mac, made and rigged in one step: mise run vm -- new linux <name>, or rm <name>"
 run = "nu tasks/vm.nu"
@@ -43,8 +47,8 @@ description = "Rig a remote machine over SSH: mise run push user@host. Pass --dr
 run = "nu tasks/push.nu"
 
 [tasks.test]
-description = "Run the tests: the config merge, the capture checks, and where the config comes from, against throwaway folders"
-run = ["nu tests/apply.nu", "nu tests/capture.nu", "nu tests/config.nu"]
+description = "Run the tests: the config merge, the capture checks, where the config comes from, and the report to fleet-api, against throwaway folders"
+run = ["nu tests/apply.nu", "nu tests/capture.nu", "nu tests/config.nu", "nu tests/report.nu"]
 
 [tasks."plugin:check"]
 description = "Check the Claude Code plugin in plugin/ and the marketplace file with Claude Code's own validator (needs claude)"
