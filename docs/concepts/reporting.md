@@ -38,15 +38,29 @@ One JSON object, fleet-api's `DeviceReport` (schema 1; every field's rule is in 
 | `power`, `battery`, `lid` | `pmset -g batt` and `ioreg` on macOS; `/sys/class/power_supply` and `/proc/acpi/button/lid` on Linux | Windows: `unknown`, with why |
 | `sleep` | `pmset -g` and `pmset -g assertions` on macOS: idle and display sleep, and the processes holding sleep off. `none` on a Linux machine that cannot sleep | Linux and Windows otherwise: `unknown`, with why |
 | `keeper` | Whether the session's keep-awake is running now, from the process list | |
-| `rig` | `doctor --json`: rig commit, tools installed, Claude version, config applied, logged in, session running, work folder | |
+| `rig` | `doctor --json`: rig commit, tools installed, Claude version, config applied, logged in, session running, work folder. Also `rig.login` (below) | |
 | `claims` | `doctor --json`'s `slots` and `claims`, when it has them | |
 
 A section that could not be read says `unknown` and why, never a zero that looks like a measurement.
 
+### The login (`rig.login`)
+
+For seeing a login run out before it does. fleet-api keeps fields it does not know as posted, so this needs no change there; it has no condition for it yet.
+
+| Field | From |
+|---|---|
+| `status`, `why` | `ok` when `claude auth status` answered; `unknown` and why when it did not |
+| `logged_in`, `auth_method` | `claude auth status`: `loggedIn` and `authMethod` only |
+| `refresh_expires` | When the refresh token expires, Unix milliseconds: `claudeAiOauth.refreshTokenExpiresAt` of Claude's stored login, `~/.claude/.credentials.json` on Linux and Windows, the keychain item `Claude Code-credentials` on macOS (the file wins when it is there) |
+| `refresh_expires_why` | Instead of `refresh_expires`, when it cannot be read |
+
+Only that one number is taken out of the stored login; the rest of it, the tokens, is never kept or printed.
+
 ## What is never sent
 
 - **Nothing that names a person or a network.** No user names, IP or MAC addresses, serial numbers. A home folder is written `~` (`~/work`), whoever's it is. A claim held by `user@host` is sent as `a person on <host>`.
-- **The token.** It is only in the `Authorization` header.
+- **The write token.** It is only in the `Authorization` header.
+- **Claude's login.** No access or refresh token, and not the email or organisation `claude auth status` shows.
 
 The machine's name is sent as `host.name`. It is the name the machine has in the Claude app: the host name, or `RIG_NAME` ([Settings](../reference/settings.md)). If the host name contains your name, set `RIG_NAME`.
 

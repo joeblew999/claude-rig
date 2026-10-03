@@ -15,6 +15,7 @@ use ../tasks/awake.nu [awake-plan run-windows-keeper keeper-state]
 const REPORT = path self ../tasks/report.nu
 const ENROLL = path self ../tasks/enroll.nu
 const FIXTURE = path self fixtures/doctor.json
+const CREDENTIALS = path self fixtures/credentials.json
 # Nothing listens here, so every post fails at once.
 const CLOSED = "http://127.0.0.1:9"
 
@@ -255,6 +256,50 @@ def test-token-file [root: path] {
 }
 
 # The session's keep-awake holds sleep off while what it wraps runs.
+# A stand-in for `claude` that says what `claude auth status` says, email
+# and organisation included, so the test can see they are left out.
+def fake-claude [dir: path] {
+  mkdir $dir
+  let answer = '{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty","email":"someone@example.com","orgId":"0b9c1d2e","orgName":"Someone Example Org"}'
+  if $nu.os-info.name == "windows" {
+    $"@echo ($answer)\r\n" | save --force ($dir | path join claude.cmd)
+  } else {
+    $"#!/bin/sh\necho '($answer)'\n" | save --force ($dir | path join claude)
+    ^chmod +x ($dir | path join claude)
+  }
+}
+
+def test-login [root: path] {
+  print "the login, with a made-up stored login"
+  let claude_home = $root | path join login-claude
+  mkdir $claude_home
+  cp $CREDENTIALS ($claude_home | path join .credentials.json)
+  let bin = $root | path join login-bin
+  fake-claude $bin
+  let run = {|home|
+    with-env { RIG_CONFIG_HOME: ($root | path join login-rig), CLAUDE_HOME: $home, PATH: ([$bin] ++ $env.PATH), FLEET_API_WRITE_TOKEN: "" } {
+      ^$nu.current-exe $REPORT --print --doctor $FIXTURE | complete
+    }
+  }
+  let result = do $run $claude_home
+  check "report --print succeeds" ($result.exit_code == 0)
+  let login = $result.stdout | from json | get rig.login
+  check "it says logged in, and how" ($login.status == "ok" and $login.logged_in and $login.auth_method == "claude.ai")
+  let stored = open --raw $CREDENTIALS | decode utf-8 | from json | get claudeAiOauth
+  let leaked = [$stored.accessToken $stored.refreshToken accessToken refreshToken sk-ant] | where {|secret| $result.stdout | str contains $secret }
+  if ($leaked | is-not-empty) { print $"        in the report: ($leaked | str join ', ')" }
+  check "no token, or its name, is in the report" ($leaked | is-empty)
+  check "it has the refresh token's expiry, in Unix milliseconds" ($login.refresh_expires? == 1792989310012)
+  check "nor the email or the organisation" (not ($result.stdout =~ '(?i)someone@example|0b9c1d2e|Example Org|"email"|"org'))
+  check "the report still holds to the schema" (schema-errors ($result.stdout | from json) | is-empty)
+
+  let bare = $root | path join login-bare
+  mkdir $bare
+  {claudeAiOauth: {accessToken: "x"}} | to json | save ($bare | path join .credentials.json)
+  let without = do $run $bare | get stdout | from json | get rig.login
+  check "a stored login with no expiry says why, and gives none" ("refresh_expires" not-in $without and ($without.refresh_expires_why? | default "") != "")
+}
+
 def test-awake [] {
   print "keeping the machine awake"
   let os = $nu.os-info.name
@@ -301,6 +346,7 @@ def main [] {
     test-spool $root
     test-no-token $root
     test-token-file $root
+    test-login $root
     test-awake
   } catch {|failure|
     rm --recursive --force $root

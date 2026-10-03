@@ -374,6 +374,57 @@ def sleep-section [lid: record]: nothing -> record {
   }
 }
 
+# --- The login -----------------------------------------------------------------
+
+# The refresh token's expiry, from the text of Claude's stored login. Only
+# that one number is taken out; nothing else in the text (the tokens) is kept,
+# and a text that cannot be read gives a reason that does not quote it.
+export def expiry-from [text: string]: nothing -> record {
+  let at = try { $text | from json | get claudeAiOauth.refreshTokenExpiresAt } catch { null }
+  if ($at | describe) != "int" or $at <= 0 { return {why: "the stored login has no refresh token expiry"} }
+  # Unix milliseconds; a number this small is seconds.
+  {at: (if $at < 100_000_000_000 { $at * 1000 } else { $at })}
+}
+
+# When the stored login's refresh token expires, Unix milliseconds, or why
+# that is not known. Claude keeps the login in ~/.claude/.credentials.json
+# on Linux and Windows, and in the keychain item "Claude Code-credentials" on
+# macOS (the file wins when it is there).
+def refresh-expiry []: nothing -> record {
+  let file = claude-home | path join .credentials.json
+  if ($file | path exists) {
+    return (expiry-from (try { open --raw $file | decode utf-8 } catch { "" }))
+  }
+  if $nu.os-info.name != "macos" { return {why: "no ~/.claude/.credentials.json"} }
+  let found = ^security find-generic-password -s "Claude Code-credentials" -w | complete
+  if $found.exit_code != 0 { return {why: "no Claude login in the keychain"} }
+  let text = $found.stdout | str trim
+  # security prints the item as hex when it is not plain text.
+  let text = if ($text | str starts-with "{") { $text } else { try { $text | decode hex | decode utf-8 } catch { "" } }
+  expiry-from $text
+}
+
+# The login, as the login plan needs it: logged in, how, and when the
+# refresh token runs out. From `claude auth status`, of which only loggedIn
+# and authMethod are taken (never the email or the organisation), and the
+# stored login, of which only the expiry is taken (never a token).
+def login-section []: nothing -> record {
+  let status = with-env {PATH: ($env.PATH ++ [(local-bin)])} {
+    if (have claude) { ^claude auth status | complete } else { null }
+  }
+  if $status == null { return (unknown "Claude is not installed") }
+  let info = try { $status.stdout | from json } catch { null }
+  if $info == null { return (unknown "claude auth status gave no answer") }
+  let expiry = refresh-expiry
+  {
+    status: "ok"
+    logged_in: ($info.loggedIn? | default false)
+    auth_method: ($info.authMethod? | default "" | into string | cut $in)
+    refresh_expires: $expiry.at?
+    refresh_expires_why: $expiry.why?
+  } | compact --empty
+}
+
 # --- doctor --json -----------------------------------------------------------
 
 # This machine's doctor report, or null with why it could not be had.
@@ -387,6 +438,8 @@ def doctor-facts []: nothing -> record {
   try { {facts: ($result.stdout | from json), why: ""} } catch { {facts: null, why: "doctor --json printed no JSON"} }
 }
 
+# The rig section. `login` is an addition of claude-rig's: fleet-api keeps
+# fields it does not know, as posted.
 def rig-section [facts: any, why: string]: nothing -> record {
   if $facts == null { return (unknown $why) }
   {
@@ -398,6 +451,7 @@ def rig-section [facts: any, why: string]: nothing -> record {
     logged_in: ($facts.logged_in? | default false)
     session_running: ($facts.session_running? | default false)
     work_dir: (tilde ($facts.work_dir? | default "") | cut $in)
+    login: (login-section)
   } | compact --empty
 }
 
