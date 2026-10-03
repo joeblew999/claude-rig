@@ -31,10 +31,42 @@ def ci-run [commit: string] {
   $result.stdout | from json | get 0?
 }
 
-# Tag main as vX.Y.Z and push the tag; the release workflow does the rest.
+# The checks CI runs, run here: a release is cut from this machine in about a
+# minute, and GitHub's CI on the tag verifies every OS afterwards.
+const LOCAL_CHECKS = [lint test "docs:check" "github:check" "ci:bootstrap"]
+
+# Run one mise task and say whether it passed. ci:bootstrap rigs the machine it
+# runs on, so here it gets a throwaway home folder, removed afterwards.
+def run-check [task: string]: nothing -> bool {
+  let home = if $task == "ci:bootstrap" { mktemp --directory --tmpdir claude-rig-release.XXXXXX } else { null }
+  let result = if $home == null {
+    ^mise run $task | complete
+  } else {
+    # As in CI: the bootstrap's first run on a bare home, then the checks on
+    # its output. mise's download cache is shared, so it does not fetch again.
+    let cache = $env.MISE_CACHE_DIR? | default ($nu.home-dir | path join Library Caches mise)
+    let log = $home | path join first-run.log
+    let out = with-env { HOME: $home, MISE_CACHE_DIR: $cache } {
+      let first = ^sh bootstrap.sh | complete
+      $"($first.stdout)($first.stderr)" | save --force $log
+      if $first.exit_code != 0 { $first } else { ^mise run $task -- $log | complete }
+    }
+    rm --recursive --force $home
+    $out
+  }
+  if $result.exit_code != 0 {
+    print --stderr ($"($result.stdout)($result.stderr)" | lines | last 15 | str join "\n")
+  }
+  $result.exit_code == 0
+}
+
+# Check here, tag main as vX.Y.Z, push the tag and publish the release, all
+# from this machine. GitHub's CI then runs on the tag for every OS; a failure
+# there is fixed with a patch release.
 def main [
   tag: string  # The version, vX.Y.Z
   --dry-run    # Run every check and say what would be done, change nothing
+  --wait-ci    # Also require GitHub's CI to have passed on HEAD (slow; off by default)
 ] {
   git fetch --quiet --tags origin main | ignore
   let head = git rev-parse HEAD
@@ -48,8 +80,13 @@ def main [
     [$"HEAD \(($head | str substring 0..<7)) is main on GitHub \(($main | str substring 0..<7))" ($head == $main)]
     [$"($tag) is not a tag here" ((git tag --list $tag) == "")]
     [$"($tag) is not a tag on GitHub" ((git ls-remote --tags origin $"refs/tags/($tag)") == "")]
-    [$"CI \(($WORKFLOW)) passed on HEAD: ($ci)" ($run != null and $run.status == "completed" and $run.conclusion == "success")]
   ]
+  let checks = if $wait_ci {
+    $checks | append {what: $"CI \(($WORKFLOW)) passed on HEAD: ($ci)", passed: ($run != null and $run.status == "completed" and $run.conclusion == "success")}
+  } else {
+    $checks
+  }
+  let checks = $checks | append ($LOCAL_CHECKS | each {|task| {what: $"mise run ($task)", passed: (run-check $task)} })
   for check in $checks {
     print $"  (if $check.passed { 'ok  ' } else { 'FAIL' })  ($check.what)"
   }
@@ -59,12 +96,14 @@ def main [
   if $dry_run {
     print $"  would   git tag -a ($tag) -m ($tag) ($head)"
     print $"  would   git push origin ($tag)"
+    print $"  would   publish the GitHub Release for ($tag)"
     print "release: dry run finished. Nothing was changed."
     return
   }
   git tag -a $tag -m $tag $head | ignore
   git push --quiet origin $tag | ignore
-  print $"release: pushed ($tag). The release workflow publishes it: https://github.com/joeblew999/claude-rig/actions/workflows/release.yml"
+  main publish $tag
+  print $"release: ($tag) is out. GitHub's CI now checks it on every OS: https://github.com/joeblew999/claude-rig/actions"
 }
 
 # The notes: the commits since the previous version tag, and where it was tested.
