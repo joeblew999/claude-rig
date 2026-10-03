@@ -21,12 +21,13 @@ def job [root: path, slots: int, args: list<string>]: nothing -> record {
 }
 
 def setting [root: path, slots: int]: nothing -> record {
+  # On Windows the variable is `Path`; a second one named `PATH` would be ignored.
+  let path_name = $env | columns | where {|name| ($name | str lowercase) == "path" } | first
   {
     RIG_CLAIMS: ($root | path join claims)
     RIG_WORKDIR: ($root | path join work)
     RIG_SLOTS: ($slots | into string)
-    PATH: ([($root | path join bin)] ++ $env.PATH)
-  }
+  } | insert $path_name ([($root | path join bin)] ++ $env.PATH)
 }
 
 # A stand-in for `claude` on PATH: reads the work, prints the folder it runs
@@ -117,10 +118,10 @@ def test-job [root: path] {
   check "in its own folder under the work folder's jobs/" (($ran_in | path dirname | path basename) == "jobs" and ($ran_in | path basename) in $jobs) $done
   check "and lets go of its claim when it ends" (held $root | is-empty)
 
-  # A job that outlives its claim's first expiry (1 s) keeps it by renewing it.
+  # A job that outlives its claim's first expiry (2 s) keeps it by renewing it.
   let both = [
-    {|| with-env {FAKE_SECONDS: "4"} { job $root 1 [--caller long --label long --ttl "1"] } }
-    {|| sleep 2500ms; claims $root 1 [take --caller late] }
+    {|| with-env {FAKE_SECONDS: "6"} { job $root 1 [--caller long --label long --ttl "2"] } }
+    {|| sleep 3500ms; claims $root 1 [take --caller late] }
   ] | par-each --keep-order {|step| do $step }
   check "a running job keeps its claim past the first expiry" ($both.1.exit_code == 6 and $both.1.stdout =~ "long") $both
   check "and the job finished" ($both.0.exit_code == 0) $both

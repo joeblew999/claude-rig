@@ -50,7 +50,7 @@ export def default-caller []: nothing -> string {
 }
 
 def now-text []: nothing -> string {
-  date now | format date "%Y-%m-%dT%H:%M:%S%:z"
+  date now | format date "%Y-%m-%dT%H:%M:%S%.3f%:z"
 }
 
 def short-time [text: string]: nothing -> string {
@@ -148,7 +148,7 @@ export def take [who: string, what: string, ttl: int]: nothing -> record {
         who: $who
         what: $what
         since: (now-text)
-        until: ($started + ($ttl * 1sec) | format date "%Y-%m-%dT%H:%M:%S%:z")
+        until: ($started + ($ttl * 1sec) | format date "%Y-%m-%dT%H:%M:%S%.3f%:z")
         job_dir: (work-dir | path join jobs $id)
       }
       write-claim $claim
@@ -163,7 +163,7 @@ def renew [id: string, ttl: int]: nothing -> bool {
     let file = claim-file $id
     if not ($file | path exists) { return false }
     let claim = open --raw $file | from json
-    write-claim ($claim | upsert until ((date now) + ($ttl * 1sec) | format date "%Y-%m-%dT%H:%M:%S%:z"))
+    write-claim ($claim | upsert until ((date now) + ($ttl * 1sec) | format date "%Y-%m-%dT%H:%M:%S%.3f%:z"))
     true
   }
 }
