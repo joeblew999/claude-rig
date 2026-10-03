@@ -1,0 +1,15 @@
+{
+  "name": "claude-rig",
+  "description": "claude-rig: rig machines over SSH so each one runs Claude and shows in the Claude app, then see them and give them work",
+  "owner": {
+    "name": "joeblew999",
+    "url": "https://github.com/joeblew999"
+  },
+  "plugins": [
+    {
+      "name": "rig",
+      "source": "./plugin",
+      "description": "Rig a machine over SSH, make a VM, see the fleet and give it work, from inside Claude Code"
+    }
+  ]
+}
