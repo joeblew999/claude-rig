@@ -73,6 +73,28 @@ def install-claude [] {
   }
 }
 
+# Make ~/.claude-rig lead to this checkout, if nothing else is there.
+def --env link-rig-home [] {
+  let home_rig = $nu.home-dir | path join .claude-rig
+  let here = repo-dir | path expand
+  if ($home_rig | path exists) {
+    if ($home_rig | path expand) == $here {
+      ok $"~/.claude-rig is this rig \(($here))"
+    } else {
+      skipped $"~/.claude-rig is another folder, so it is left alone \(this rig is ($here))"
+    }
+    return
+  }
+  change $"link ~/.claude-rig to ($here)" {
+    if (is-windows) {
+      # A junction needs no administrator rights, unlike a symbolic link.
+      ^cmd /c mklink /J $home_rig $here | ignore
+    } else {
+      ^ln -s $here $home_rig
+    }
+  }
+}
+
 def main [
   --dry-run  # Report what would change and change nothing
 ] {
@@ -117,6 +139,12 @@ def main [
   } else {
     change "install Claude Code with the native installer" { install-claude }
   }
+
+  # Skills and docs say "~/.claude-rig", so make that the rig on every machine,
+  # also where the rig runs from a checkout somewhere else.
+  print "The rig"
+
+  link-rig-home
 
   print "Claude config"
 
