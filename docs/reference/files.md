@@ -29,7 +29,7 @@ parent: Reference
 | `~/.claude-rig-session.log` | What the server last printed (Windows) | the session |
 | `~/.config/claude-rig/machines.json` | The machine list, on the Mac you push from | `push`, `fleet add` |
 | `~/.config/claude-rig/config.toml` | `folder = "<path>"`: your config folder, on the Mac you push from | `config init` |
-| `~/.config/claude-rig/device-id` | The machine id in its reports: 16 random hex digits, made once | the first report |
-| `~/.config/claude-rig/fleet-api.token` | fleet-api's write token, readable by the user only (mode 600; on Windows, an access list with only the user) | `push`, or the run when `FLEET_API_WRITE_TOKEN` is set |
+| `~/.config/claude-rig/device-id` | The machine id in its reports: 16 random hex digits, made once | the first report, or `push` asking for it |
+| `~/.config/claude-rig/fleet-api-access.json` | The machine's own fleet-api token, `{"client_id", "client_secret"}`, readable by the user only (mode 600; on Windows, an access list with only the user) ([Reporting](../concepts/reporting.md#the-machines-token)) | `push`, or the run when `FLEET_API_ACCESS_CLIENT_ID` and `FLEET_API_ACCESS_CLIENT_SECRET` are set |
 | `~/.config/claude-rig/report-spool/` | Reports not yet delivered to fleet-api, one JSON file each, at most 288 | the session, `report` |
 | `~/.config/claude-rig/vms.json` | The VMs on this Mac, as the VM keeper last saw them: `ts` (Unix ms) and `vms` (fleet-api's shape). The report carries it while fresh | `irgo-winvm keeper` |

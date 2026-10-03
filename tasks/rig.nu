@@ -166,7 +166,7 @@ def main [
 
   print "Reporting"
 
-  token-step
+  access-step
 
   if (dry-run) {
     print "rig: dry run finished. Nothing was changed."

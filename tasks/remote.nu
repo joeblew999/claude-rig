@@ -20,6 +20,33 @@ export def probe [options: list<string>, target: string, command: string]: nothi
   ^ssh -n -o BatchMode=yes ...$options $target $command | complete
 }
 
+# How to run one of the rig's nu scripts on a rigged machine, for its OS:
+# {command, input}. On Windows the script goes to PowerShell on stdin:
+# quoting it through cmd.exe goes wrong. Arguments are plain words.
+export def nu-on [os: string, script: string, args: list<string> = []]: nothing -> record {
+  let rest = $args | str join " "
+  if $os == "Windows" {
+    {
+      command: "powershell -NoProfile -ExecutionPolicy Bypass -Command -"
+      input: ($'& "$env:LOCALAPPDATA\mise\shims\nu.exe" "$HOME\.claude-rig\tasks\($script)" ($rest)' | str trim)
+    }
+  } else {
+    {
+      command: ($'PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH" nu "$HOME/.claude-rig/tasks/($script)" ($rest)' | str trim)
+      input: null
+    }
+  }
+}
+
+# Run it there and capture it.
+export def run-nu [options: list<string>, target: string, how: record]: nothing -> record {
+  if $how.input == null {
+    ^ssh -n -o BatchMode=yes ...$options $target $how.command | complete
+  } else {
+    $how.input | ^ssh -o BatchMode=yes ...$options $target $how.command | complete
+  }
+}
+
 # Where the list of rigged machines is kept. It is on this machine only,
 # never in the repo: it names the owner's machines.
 export def machines-file []: nothing -> path {

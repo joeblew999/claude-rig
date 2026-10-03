@@ -6,17 +6,20 @@
 # to fleet-api's schema, as fleet-api's generated SDK checks it (through
 # tasks/fleet-api.ts, so bun and the SDK the tool list installs are needed),
 # names no person or network, the machine id stays the same, a report that
-# cannot be delivered is spooled, with no token nothing is posted, and the VM
-# keeper's list is taken while fresh. Nothing here reaches fleet-api: the one
-# URL used is a closed port on this machine.
+# cannot be delivered is spooled, with no token nothing is posted, the
+# machine's token is kept readable by its user only, push makes a token with
+# fleet-api's task (here a stand-in for it), and the VM keeper's list is taken
+# while fresh. Nothing here reaches fleet-api: the one URL used is a closed
+# port on this machine.
 #
 #   nu tests/report.nu
 
-use ../tasks/report.nu [TOKEN_UNIX_COMMAND auth-from fleet-api]
+use ../tasks/report.nu [ACCESS_UNIX_COMMAND auth-from fleet-api]
 use ../tasks/awake.nu [awake-plan run-windows-keeper keeper-state]
 
 const REPORT = path self ../tasks/report.nu
 const ENROLL = path self ../tasks/enroll.nu
+const PUSH = path self ../tasks/push.nu
 const FIXTURE = path self fixtures/doctor.json
 const CREDENTIALS = path self fixtures/credentials.json
 # Nothing listens here, so every post fails at once.
@@ -27,9 +30,15 @@ def check [what: string, passed: bool] {
   print $"    ok  ($what)"
 }
 
+# A made-up Access service token.
+const ID = "made-up-id.access"
+const HIDDEN = "made-up-for-tests"
+
 # Run report.nu with a throwaway rig folder, and no token unless given.
-def run-report [rig_home: path, args: list<string>, --token: string = "", --url: string = $CLOSED]: nothing -> record {
-  with-env { RIG_CONFIG_HOME: $rig_home, FLEET_API_WRITE_TOKEN: $token, FLEET_API_READ_TOKEN: "", FLEET_API_URL: $url } {
+def run-report [rig_home: path, args: list<string>, --token, --url: string = $CLOSED]: nothing -> record {
+  let id = if $token { $ID } else { "" }
+  let secret = if $token { $HIDDEN } else { "" }
+  with-env { RIG_CONFIG_HOME: $rig_home, FLEET_API_ACCESS_CLIENT_ID: $id, FLEET_API_ACCESS_CLIENT_SECRET: $secret, FLEET_API_URL: $url } {
     ^$nu.current-exe $REPORT ...$args | complete
   }
 }
@@ -106,15 +115,15 @@ def test-spool [root: path] {
   print "a report that cannot be delivered"
   let rig_home = $root | path join spool
   let spool = $rig_home | path join report-spool
-  let run = run-report $rig_home [--doctor $FIXTURE] --token "test-token"
+  let run = run-report $rig_home [--doctor $FIXTURE] --token
   check "the run still succeeds" ($run.exit_code == 0)
   check "it says the report is spooled" ($run.stdout =~ 'report: once spooled: could not reach')
   check "the report waits in the spool" ((ls $spool | length) == 1)
-  let again = run-report $rig_home [--doctor $FIXTURE --reason interval] --token "test-token"
+  let again = run-report $rig_home [--doctor $FIXTURE --reason interval] --token
   check "the next one is spooled beside it" ($again.stdout =~ 'spooled' and (ls $spool | length) == 2)
   let kept = ls $spool | get name | sort | each {|file| open --raw $file | decode utf-8 | from json }
   check "both are whole reports, oldest first" ($kept.0.reason == "once" and $kept.1.reason == "interval" and ($kept | all {|report| (refused $report) == "" }))
-  check "the token is in none of them" ($kept | all {|report| not ($report | to json | str contains "test-token") })
+  check "the token is in none of them" ($kept | all {|report| not ($report | to json | str contains $HIDDEN) and not ($report | to json | str contains $ID) })
 }
 
 def test-no-token [root: path] {
@@ -122,27 +131,32 @@ def test-no-token [root: path] {
   let rig_home = $root | path join no-token
   let run = run-report $rig_home [--doctor $FIXTURE]
   check "the run still succeeds" ($run.exit_code == 0)
-  check "reporting says skipped and why" ($run.stdout =~ 'skipped: no write token')
+  check "reporting says skipped and why" ($run.stdout =~ 'skipped: no fleet-api token')
   check "nothing is spooled" (not ($rig_home | path join report-spool | path exists))
 
-  let step = with-env { RIG_CONFIG_HOME: $rig_home, FLEET_API_WRITE_TOKEN: "", RIG_CHANGES: "0", RIG_DRY_RUN: "0" } {
-    ^$nu.current-exe --commands $"use '($ENROLL)' [token-step]; token-step" | complete
+  let step = access-step $rig_home "" ""
+  check "the rig's token step skips, saying how to give one" ($step.exit_code == 0 and $step.stdout =~ 'skip +reporting to fleet-api: no token')
+  let half = access-step $rig_home $ID ""
+  check "half a token stops the rig, saying so" ($half.exit_code != 0 and $half.stderr =~ 'both')
+}
+
+# The rig's token step, in a throwaway rig folder, with this token in its environment.
+def access-step [rig_home: path, id: string, secret: string]: nothing -> record {
+  with-env { RIG_CONFIG_HOME: $rig_home, FLEET_API_ACCESS_CLIENT_ID: $id, FLEET_API_ACCESS_CLIENT_SECRET: $secret, RIG_CHANGES: "0", RIG_DRY_RUN: "0" } {
+    ^$nu.current-exe --commands $"use '($ENROLL)' [access-step]; access-step" | complete
   }
-  check "the rig's token step skips, saying how to give one" ($step.exit_code == 0 and $step.stdout =~ 'skip +reporting to fleet-api: no write token')
 }
 
 def test-token-file [root: path] {
   print "the token on a machine"
   let rig_home = $root | path join token
-  let file = $rig_home | path join fleet-api.token
-  let step = {|token|
-    with-env { RIG_CONFIG_HOME: $rig_home, FLEET_API_WRITE_TOKEN: $token, RIG_CHANGES: "0", RIG_DRY_RUN: "0" } {
-      ^$nu.current-exe --commands $"use '($ENROLL)' [token-step]; token-step" | complete
-    }
-  }
-  let first = do $step "test-token-1"
-  check "the rig keeps a token from the environment" ($first.exit_code == 0 and $first.stdout =~ 'change +keep the fleet-api write token' and (open --raw $file | decode utf-8) == "test-token-1")
-  check "and never prints it" (not ($first.stdout | str contains "test-token-1"))
+  let file = $rig_home | path join fleet-api-access.json
+  mkdir $rig_home
+  "old-shared-token" | save ($rig_home | path join fleet-api.token)
+  let first = access-step $rig_home $ID $HIDDEN
+  check "the rig keeps a token from the environment" ($first.exit_code == 0 and $first.stdout =~ 'change +keep the fleet-api token' and (open --raw $file | decode utf-8 | from json) == {client_id: $ID, client_secret: $HIDDEN})
+  check "and never prints it" (not ($first.stdout | str contains $HIDDEN))
+  check "the old shared write token is removed" ($first.stdout =~ 'no longer takes' and not ($rig_home | path join fleet-api.token | path exists))
   if $nu.os-info.name == "windows" {
     let acl = ^icacls $file | complete | get stdout
     print ($acl | lines | where {|line| $line =~ ':' } | str join "\n")
@@ -150,22 +164,78 @@ def test-token-file [root: path] {
   } else {
     check "the file is readable by the user only" ((ls -l $file | get 0.mode) == "rw-------")
   }
-  check "a second run changes nothing" ((do $step "test-token-1").stdout =~ 'ok +fleet-api write token')
-  check "a run with no token in its environment keeps the file" ((do $step "").stdout =~ 'ok +fleet-api write token')
-  let run = with-env { RIG_CONFIG_HOME: $rig_home, FLEET_API_WRITE_TOKEN: "", FLEET_API_URL: $CLOSED } {
+  check "a second run changes nothing" ((access-step $rig_home $ID $HIDDEN).stdout =~ 'ok +fleet-api token')
+  check "a run with no token in its environment keeps the file" ((access-step $rig_home "" "").stdout =~ 'ok +fleet-api token')
+  let run = with-env { RIG_CONFIG_HOME: $rig_home, FLEET_API_ACCESS_CLIENT_ID: "", FLEET_API_ACCESS_CLIENT_SECRET: "", FLEET_API_URL: $CLOSED } {
     ^$nu.current-exe $REPORT --doctor $FIXTURE | complete
   }
-  check "a report uses the token in the file" ($run.stdout =~ 'spooled')
+  check "a report uses the token in the file" ($run.stdout =~ 'spooled: could not reach')
+  let who = with-env { RIG_CONFIG_HOME: $rig_home, RIG_NAME: "Studio_2.local" } { ^$nu.current-exe $REPORT --whoami | complete | get stdout | from json }
+  check "--whoami gives the machine id, the token's name, and that it has one" ($who.id =~ '^[0-9a-f]{16}$' and $who.token_name == "studio-2" and $who.has_token)
 
   if $nu.os-info.name != "windows" {
     # What push runs on a macOS or Linux machine, run here in a made-up home.
     let home = $root | path join remote-home
     mkdir $home
-    let sent = do { cd $home; "test-token-2" | ^sh -c ($TOKEN_UNIX_COMMAND | str replace --regex "^sh -c '(.*)'$" '$1') | complete }
-    let remote = $home | path join .config claude-rig fleet-api.token
-    check "push's command keeps the token it is sent" ($sent.exit_code == 0 and (open --raw $remote | decode utf-8) == "test-token-2")
+    let text = {client_id: $ID, client_secret: $HIDDEN} | to json --raw
+    let sent = do { cd $home; $text | ^sh -c ($ACCESS_UNIX_COMMAND | str replace --regex "^sh -c '(.*)'$" '$1') | complete }
+    let remote = $home | path join .config claude-rig fleet-api-access.json
+    check "push's command keeps the token it is sent" ($sent.exit_code == 0 and (open --raw $remote | decode utf-8) == $text)
     check "readable by that user only" ((ls -l $remote | get 0.mode) == "rw-------")
   }
+}
+
+# A stand-in for fleet-api's checkout: its access:token task, with the same
+# commands and answers as fleet-api's scripts/access.mjs, keeping its tokens
+# in a file instead of at Cloudflare. ci:push uses it too. mise must trust the
+# folder: MISE_TRUSTED_CONFIG_PATHS.
+export def fake-fleet-api [dir: path] {
+  mkdir $dir
+  let script = $dir | path join access.nu
+  [
+    "def main [command: string, ...args: string] {"
+    "  let state = $env.FILE_PWD | path join tokens.json"
+    "  let tokens = if ($state | path exists) { open $state } else { [] }"
+    "  match $command {"
+    "    create => {"
+    "      let name = $'fleet-api-($args.0)'"
+    "      if ($tokens | any {|t| $t.name == $name }) { print $'FAIL  ($name) exists: revoke it first, or pick another name'; exit 1 }"
+    "      let count = $env.FILE_PWD | path join made"
+    "      let n = (if ($count | path exists) { open --raw $count | into int } else { 0 }) + 1"
+    "      $n | into string | save --force $count"
+    "      $tokens | append {name: $name, device: $args.1} | to json | save --force $state"
+    "      {client_id: $'stub-($n).access', client_secret: $'stub-secret-($n)'} | to json --raw | save --force $args.2"
+    "      print $'PASS  ($name): posts for ($args.1) only'"
+    "    }"
+    "    list => { $tokens | each {|t| print $'($t.name)\tdevice ($t.device)\texpires 2027-10-03' } | ignore }"
+    "    revoke => { $tokens | where name != $'fleet-api-($args.0)' | to json | save --force $state; print 'PASS  revoked' }"
+    "  }"
+    "}"
+  ] | str join "\n" | save --force $script
+  $"[tasks.\"access:token\"]\nrun = '\"($nu.current-exe)\" \"($script)\"'\n" | save --force ($dir | path join mise.toml)
+}
+
+def test-make-token [root: path] {
+  print "push makes a machine's token with fleet-api's task"
+  let fleet_api = $root | path join fleet-api
+  fake-fleet-api $fleet_api
+  let make = {|name, id|
+    let folder = mktemp --directory | path expand
+    let result = with-env { MISE_TRUSTED_CONFIG_PATHS: $fleet_api } {
+      ^$nu.current-exe --commands $"use '($PUSH)' [make-token]; make-token '($fleet_api)' ($name) ($id) '($folder)' | to json --raw" | complete
+    }
+    let made = try { $result.stdout | lines | last | from json } catch { null }
+    let token = if $made != null { open --raw $made.file | decode utf-8 | from json } else { null }
+    rm --recursive --force $folder
+    {exit_code: $result.exit_code, made: $made, token: $token, said: $"($result.stdout)($result.stderr)"}
+  }
+  let first = do $make "box" "00000000000000aa"
+  if $first.exit_code != 0 { print $first.said }
+  check "a new machine gets a new token" ($first.exit_code == 0 and not $first.made.rotated and $first.token.client_id == "stub-1.access")
+  let again = do $make "box" "00000000000000aa"
+  check "the same machine again: the token is revoked and made again" ($again.exit_code == 0 and $again.made.rotated and $again.token.client_secret == "stub-secret-2")
+  let other = do $make "box" "00000000000000bb"
+  check "another machine of the same name is refused, and the token left alone" ($other.exit_code != 0 and $other.said =~ 'for another machine' and (open ($fleet_api | path join tokens.json) | get device) == ["00000000000000aa"])
 }
 
 # The session's keep-awake holds sleep off while what it wraps runs.
@@ -193,7 +263,7 @@ def test-login [root: path] {
   let faked = $nu.os-info.name != "windows"
   if $faked { fake-claude $bin }
   let run = {|home|
-    with-env { RIG_CONFIG_HOME: ($root | path join login-rig), CLAUDE_HOME: $home, PATH: ([$bin] ++ $env.PATH), FLEET_API_WRITE_TOKEN: "" } {
+    with-env { RIG_CONFIG_HOME: ($root | path join login-rig), CLAUDE_HOME: $home, PATH: ([$bin] ++ $env.PATH), FLEET_API_ACCESS_CLIENT_ID: "", FLEET_API_ACCESS_CLIENT_SECRET: "" } {
       ^$nu.current-exe $REPORT --print --doctor $FIXTURE | complete
     }
   }
@@ -291,6 +361,7 @@ def main [] {
     test-spool $root
     test-no-token $root
     test-token-file $root
+    test-make-token $root
     test-login $root
     test-vms $root
     test-awake

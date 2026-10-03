@@ -2,7 +2,8 @@
 # log in, and keep a Claude session running. Used by rig.nu.
 
 use lib.nu *
-use report.nu [token-file save-token]
+use report.nu [access-file access-from save-access]
+use userconfig.nu [rig-home]
 
 const DAEMON = "claude-rig"
 
@@ -231,21 +232,35 @@ export def --env session-step [] {
   }
 }
 
-# --- The fleet-api write token ---------------------------------------------
+# --- The fleet-api token ---------------------------------------------------
 
-# Keep the write token the session reports with. It comes from
-# FLEET_API_WRITE_TOKEN in this run's environment (the one-line bootstrap),
-# or push has already put it in the token file. It is never printed.
-export def --env token-step [] {
-  let file = token-file
-  let wanted = $env.FLEET_API_WRITE_TOKEN? | default "" | str trim
-  let kept = read-text $file | default "" | str trim
-  if $wanted == "" and $kept == "" {
-    skipped "reporting to fleet-api: no write token (set FLEET_API_WRITE_TOKEN, or push from a machine that has it)"
+# Keep the machine's own Cloudflare Access service token, which the session
+# reports with. It comes from FLEET_API_ACCESS_CLIENT_ID and
+# FLEET_API_ACCESS_CLIENT_SECRET in this run's environment (the one-line
+# bootstrap), or push has already put it in the file. It is never printed.
+export def --env access-step [] {
+  let file = access-file
+  let id = $env.FLEET_API_ACCESS_CLIENT_ID? | default "" | str trim
+  let secret = $env.FLEET_API_ACCESS_CLIENT_SECRET? | default "" | str trim
+  # The shared write token fleet-api took before Access: refused at the edge now.
+  let old = rig-home | path join fleet-api.token
+  if ($old | path exists) {
+    change $"remove ($old), the shared write token fleet-api no longer takes" { rm --force $old }
+  }
+  if ($id == "") != ($secret == "") {
+    fail rig "set both FLEET_API_ACCESS_CLIENT_ID and FLEET_API_ACCESS_CLIENT_SECRET, or neither"
+  }
+  let wanted = if $id != "" { access-from ({client_id: $id, client_secret: $secret} | to json) } else { null }
+  if $id != "" and $wanted == null {
+    fail rig "FLEET_API_ACCESS_CLIENT_ID or _SECRET has characters a token does not have"
+  }
+  let kept = access-from (read-text $file)
+  if $wanted == null and $kept == null {
+    skipped "reporting to fleet-api: no token (set FLEET_API_ACCESS_CLIENT_ID and FLEET_API_ACCESS_CLIENT_SECRET, or push from the owner's Mac, which makes one)"
     return
   }
-  if $wanted != "" and $wanted != $kept {
-    change $"keep the fleet-api write token in ($file), readable by this user only" { save-token $wanted }
+  if $wanted != null and $wanted != $kept {
+    change $"keep the fleet-api token in ($file), readable by this user only" { save-access $wanted }
     return
   }
   # On macOS and Linux, also check no one else can read it.
@@ -253,7 +268,7 @@ export def --env token-step [] {
   if $mode != "rw-------" {
     change $"make ($file) readable by this user only" { ^chmod 600 $file }
   } else {
-    ok $"fleet-api write token \(($file))"
+    ok $"fleet-api token \(($file))"
   }
 }
 
