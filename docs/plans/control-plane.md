@@ -35,3 +35,16 @@ A machine needs a write token to report. It is passed in when the machine is rig
 2. **claude-rig reports:** `doctor` posts its report; the session (or pitchfork) posts one every few minutes and a `stop` when it goes; `fleet` reads the list from `fleet-api`, falling back to SSH.
 3. **The VM tool reports** its Mac through the same client.
 4. **Claims in the record:** a claim taken or released is posted, so the phone shows who holds which machine.
+5. **fleet-api as the fleet's message bus.** charter makes fleet-api reactive over SSE and WebSocket streams that survive deploys ("like a NATS server on Cloudflare", the owner, 3 Oct 2026). Each machine keeps one outbound stream open, so no machine needs inbound SSH and machines behind NAT or a firewall work the same. Machines publish their report, claims, job results and "waiting for login"; each subscribes to its own subject for commands: run this work, update the rig, refresh the login. `fleet run` and the [login inbox](login.md) then go through the bus and work from a phone; claims are held in the control plane as well as on the machine. SSH stays only for the first enrolment (`push`).
+
+## One source of truth
+
+Decided 3 Oct 2026 (the owner: "It's really all about SSOT … I am demanding this be a product"):
+
+| What | The one source | Everyone else |
+|---|---|---|
+| What a report and every route is | fleet-api's contract | uses what charter generates from it: the specs, the Go and TypeScript SDKs, the CLI |
+| Talking to fleet-api | charter's generated client | never hand-writes HTTP or JSON for the API |
+| A machine's host facts, rig facts and claims | claude-rig, the one thing on every machine | one report and one device id per machine |
+| A Mac's VMs | the UTM keeper | hands them to claude-rig's report through a local file; does not post itself |
+
