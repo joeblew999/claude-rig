@@ -23,7 +23,7 @@ The session is `claude remote-control`, a server that keeps the machine connecte
 
 | OS | What keeps it running |
 |---|---|
-| macOS, Linux | pitchfork runs `tasks/session.nu`, restarts it if it stops, and starts it at boot (`pitchfork boot enable`: launchd on macOS, systemd on Linux) |
+| macOS, Linux | pitchfork runs `tasks/session.nu`, restarts it if it stops, and starts it at boot (`pitchfork boot enable`: launchd on macOS, systemd on Linux). On macOS the session also keeps the Mac awake while it runs (`caffeinate -i -s`, on mains power only): a Mac that sleeps drops out of the app and stops its VMs. Closing the lid still sleeps it |
 | Windows | pitchfork cannot start at boot there. A file in the user's Startup folder starts `tasks/session.nu --keep-alive` at sign-in with no window, and the session restarts the server itself. Started over SSH, it goes through the Task Scheduler, because a program started from an SSH connection is stopped when the connection closes |
 
 Two first-run questions are answered for you, because a service has no terminal: "Enable Remote Control?" (yes: rigging the machine is that decision), and approval of the work folder. The rig made that folder, and records the approval in `~/.claude.json`, the only thing it ever writes there.
