@@ -9,6 +9,27 @@ grand_parent: This repository
 
 Every ask from the owner goes here when it is said, with its status. What is done leaves this page: its result goes to [Findings](../findings.md) and its description to the page of the part.
 
+## The order
+
+Decided 3 Oct 2026, after the owner: "Each repo that uses the charter system needs to fully use it. Dev time, run time." charter is fixed first; each repo then moves onto a charter release and deletes its local copies; only then new features. charter's other session owns #20, #21, #30 and #32–#36 (done: tasks by include, go/auth with scopes, `charter new -empty`, `charter repo`); the lead owns the rest below.
+
+| Step | What | Where | Why here |
+|---|---|---|---|
+| 1 | Local release in minutes, for repos with and without binaries ([charter#39](https://github.com/joeblew999/charter/issues/39)) | charter | every repo releases through charter, from the developer's machine |
+| 2 | The generated CLI built for every OS in a release ([charter#37](https://github.com/joeblew999/charter/issues/37)) | charter | machines talk to a charter API through a released client, not a script |
+| 3 | Access service tokens and an OIDC issuer on top of go/auth (new issue; fleet-api's verifier moves in) | charter | run-time auth for every charter project, one implementation |
+| 4 | fleet-api fully on charter: its tasks by include, the release binary, `charter repo`, go/auth with step 3, release by step 1 | fleet-api | the control plane is the first full adopter |
+| 5 | claude-rig fully on charter: `charter repo`, release by step 1, fleet-api's CLI from step 2 in place of the bun script, fleet-api's tasks by include | claude-rig | its own release script, workflows and client go |
+| 6 | The UTM repo fully on charter, renamed `utm-vm`: `charter repo`, release by step 1, its R2 keys in fnox; the keeper runs the released binary | irgo-windows-vm | one copy of the VM tool on the Mac |
+| 7 | The remaining single-source-of-truth debts below (machine list, fleet skill, pins, scanners) | all | nothing left twice |
+| 8 | Discovery and release propagation ([charter#38](https://github.com/joeblew999/charter/issues/38)) | charter, then every repo | a release reaches its consumers |
+| 9 | Logins without people: the 17:07 measurement decides copying a login or the inbox; then the inbox or copy, through fleet-api | fleet-api, claude-rig | enrolment needs no human |
+| 10 | The Windows golden image with SSH, pushed to R2 | utm-vm | VMs in seconds |
+| 11 | fleet-api as the message bus; `fleet run` and the login inbox through it | fleet-api, claude-rig | no inbound SSH |
+| 12 | Repos in the control plane, Renovate centrally, Claude workers for breaking changes | fleet-api | builds on step 8 |
+| 13 | An identity service for end users: Better Auth as a charter project | new repo | charter apps' users log in |
+| 14 | Docs for any machine over SSH; the office PC; another Mac | claude-rig | adoption |
+
 ## Next
 
 | Item | Notes |
