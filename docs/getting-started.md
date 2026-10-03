@@ -47,5 +47,5 @@ Every line says `ok`. That is the rig's promise: running it again only fixes wha
 
 ## Next
 
-- Rig more machines from your Mac: [Rig a machine over SSH](guides/push.md).
+- Rig more machines from your Mac: [Rig a machine over SSH](guides/push.md), or make one: [Make a VM worker](guides/vm.md).
 - See them all and give them work: [See and steer the fleet](guides/fleet.md).
