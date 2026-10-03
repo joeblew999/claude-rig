@@ -6,6 +6,11 @@
 # Linux, bootstrap.ps1 on Windows. The remote output is shown as it happens.
 # Safe to repeat, because the bootstrap is. No tokens are sent.
 #
+# If this machine has a config folder (`mise run config`), it is packed, checked
+# for secrets, and copied over the same SSH connection to
+# ~/.config/claude-rig/config.tar on the remote, where the run takes it in. So
+# the remote needs no access to where the config is kept.
+#
 #   nu tasks/push.nu user@host [--dry-run] [--ref <branch>]
 #                              [--port <n>] [--identity <key file>]
 #                              [--known-hosts <file>]
@@ -17,6 +22,7 @@
 
 use lib.nu *
 use remote.nu *
+use userconfig.nu [local-folder pack-for-push REMOTE_DIR REMOTE_SENT_FILE settings-file]
 
 const RAW = "https://raw.githubusercontent.com/joeblew999/claude-rig"
 
@@ -80,6 +86,25 @@ def windows-command [ref: string, dry_run: bool]: nothing -> string {
   ['powershell -NoProfile -ExecutionPolicy Bypass -Command "' $script '"'] | str join
 }
 
+# Send the config folder to the remote, as one packed file next to where the
+# run looks for it. Stops if it cannot.
+def send-config [options: list<string>, scp: list<string>, target: string, os: string, folder: path] {
+  let dir = mktemp --directory | path expand
+  pack-for-push $folder ($dir | path join config.tar)
+  let parent = $REMOTE_DIR
+  let make_dir = if $os == "Windows" {
+    $'powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path ($parent | str replace --all "/" "\\") | Out-Null"'
+  } else {
+    $"mkdir -p ($parent)"
+  }
+  let made = probe $options $target $make_dir
+  if $made.exit_code != 0 { fail push $"could not make ($parent) on ($target): ($made.stderr | str trim)" }
+  # scp is run next to the file, so no local path with a drive letter is given.
+  let sent = do { cd $dir; ^scp -q -o BatchMode=yes ...$scp config.tar $"($target):($REMOTE_SENT_FILE)" | complete }
+  rm --recursive --force $dir
+  if $sent.exit_code != 0 { fail push $"could not send the config to ($target): ($sent.stderr | str trim)" }
+}
+
 # Run the bootstrap on the remote, showing its output live. Returns its exit code.
 def run-remote [options: list<string>, target: string, command: string, script: any]: nothing -> int {
   let options = [-o ServerAliveInterval=30] ++ $options
@@ -130,6 +155,18 @@ def main [
   let os = remote-os $options $target
   let what = if $dry_run { "dry run on" } else { "rigging" }
   print $"push: ($what) ($target) \(($os)) from ($ref)"
+
+  let config = local-folder push
+  if $config == null {
+    print $"push: no config folder here \(none in (settings-file)), so none is sent"
+  } else if not ($config | path exists) {
+    fail push $"the config folder ($config) does not exist."
+  } else if $dry_run {
+    print $"push: a real run sends the config in ($config); this dry run sends nothing"
+  } else {
+    send-config $options (scp-options $port $identity $known_hosts) $target $os $config
+    print $"push: sent the config in ($config)"
+  }
 
   let code = if $os == "Windows" {
     run-remote $options $target (windows-command $ref $dry_run) null

@@ -9,6 +9,12 @@ export def ssh-options [port: any, identity: any, known_hosts: any]: nothing -> 
   | append (if $known_hosts != null { [-o $"UserKnownHostsFile=($known_hosts)"] } else { [] })
 }
 
+# The same options for scp, which names the port with -P.
+export def scp-options [port: any, identity: any, known_hosts: any]: nothing -> list<string> {
+  ssh-options null $identity $known_hosts
+  | append (if $port != null { [-P ($port | into string)] } else { [] })
+}
+
 # Run a short command on the remote and capture it. Never asks for anything.
 export def probe [options: list<string>, target: string, command: string]: nothing -> record {
   ^ssh -n -o BatchMode=yes ...$options $target $command | complete

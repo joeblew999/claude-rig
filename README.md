@@ -3,7 +3,7 @@
 [![test](https://github.com/joeblew999/claude-rig/actions/workflows/test.yml/badge.svg)](https://github.com/joeblew999/claude-rig/actions/workflows/test.yml)
 [![latest release](https://img.shields.io/github/v/release/joeblew999/claude-rig?include_prereleases)](https://github.com/joeblew999/claude-rig/releases/latest)
 
-**Turn a Mac, a Linux box, a Windows PC or a fresh UTM VM into a Claude worker you give work to from your phone.** It installs your dev tools and Claude Code, copies in your Claude config and skills from your Mac, and keeps a Claude session running, so the machine shows up in the Claude app. Safe to re-run, and no secrets stored.
+**Turn a Mac, a Linux box, a Windows PC or a fresh UTM VM into a Claude worker you give work to from your phone.** It installs your dev tools and Claude Code, brings in your own Claude config and skills from a folder or repo of yours, and keeps a Claude session running, so the machine shows up in the Claude app. Safe to re-run, and no secrets stored.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.sh | sh                  # macOS, Linux
@@ -13,4 +13,4 @@ mise run push -- user@host                                                      
 
 Then: [Getting started](docs/getting-started.md). Everything else is in [the docs](docs/README.md) ([as a site](https://joeblew999.github.io/claude-rig/)).
 
-[MIT](LICENSE). `claude/skills/mise-configuration` and `claude/skills/mise-tasks` come from [terrylica/cc-skills](https://github.com/terrylica/cc-skills) (MIT).
+[MIT](LICENSE). The rig ships no Claude config or skills of its own: you bring yours ([Your config](docs/concepts/config.md)).

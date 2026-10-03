@@ -8,11 +8,11 @@ permalink: /
 
 [![latest release](https://img.shields.io/github/v/release/joeblew999/claude-rig?include_prereleases)](https://github.com/joeblew999/claude-rig/releases/latest)
 
-You point it at a Mac, a Linux box, a Windows PC or a fresh UTM virtual machine. It installs your dev tools and Claude Code, copies in your Claude config and skills from your Mac, and keeps a Claude session running. After that, the machine shows up in the Claude app and you can give it work from your phone.
+You point it at a Mac, a Linux box, a Windows PC or a fresh UTM virtual machine. It installs your dev tools and Claude Code, brings in your own Claude config and skills, if you give it a folder or repo of them, and keeps a Claude session running. After that, the machine shows up in the Claude app and you can give it work from your phone.
 
 Three things make it more than a setup script:
 
-- **One source of truth.** Your Mac's Claude config is the master copy. Change it there, capture it, and every machine picks it up on its next run.
+- **One source of truth.** Your Mac's Claude config is the master copy, kept in a config folder of your own. Change it there, capture it, and every machine picks it up on its next run. The rig ships no one's config.
 - **Safe to re-run.** Running it again only fixes what's missing or out of date. It never wipes local settings or doubles anything up.
 - **No secrets stored.** Tokens are passed in when it runs, never kept in the repo or a VM image.
 
@@ -26,7 +26,8 @@ Start with [Getting started](getting-started.md).
 |---|---|---|
 | The bootstrap | `bootstrap.sh` (macOS, Linux), `bootstrap.ps1` (Windows) | The only per-OS code: installs git and mise, fetches the rig, starts the run |
 | The run | `tasks/rig.nu` | Everything after the bootstrap, the same nushell code on every OS ([A run](concepts/a-run.md)) |
-| The captured config | `claude/` | The copy of your Mac's `~/.claude` that every machine gets ([Your config](concepts/config.md)) |
+| Your config folder | a folder or git repo of yours, named in `~/.config/claude-rig/config.toml` on your Mac | The copy of your Mac's `~/.claude` that every machine gets; not part of this repo ([Your config](concepts/config.md)) |
+| The machine's copy | `~/.config/claude-rig/config/` on each machine | The config `push` sent, or a clone of the git URL in `RIG_CONFIG` |
 | The tool list | `mise/claude-rig.toml` | The tools every machine gets, at the same versions |
 | The session | `tasks/session.nu` | The always-on `claude remote-control` that puts a machine in the Claude app ([Login and the session](concepts/login-and-session.md)) |
 | The machine list | `~/.config/claude-rig/machines.json`, on your Mac only | The machines rigged from here, for `fleet` |
@@ -40,7 +41,6 @@ Never edit these: change the source and run the task.
 
 | Path | Written by |
 |---|---|
-| `claude/` | `mise run capture`, on your Mac |
 | `docs/_config.yml`, `docs/writing.md`, `docs/llms.txt`, `docs/_sass/` | `mise run docs:setup` |
 
 ## Every page

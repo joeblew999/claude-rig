@@ -1,13 +1,16 @@
 #!/usr/bin/env nu
-# capture.nu — copy this Mac's global Claude config into claude/
+# capture.nu — copy this machine's global Claude config into your config folder
 #
-# Safe to repeat. Builds the copy in a temp folder, checks it for secrets and
-# for paths that only exist on this Mac, and only then replaces claude/.
-# If a check fails, claude/ is untouched.
+# The config folder is the one `mise run config` shows (RIG_CONFIG, or the
+# folder in ~/.config/claude-rig/config.toml). Safe to repeat. Builds the copy
+# in a temp folder, checks it for secrets and for paths that only exist on this
+# machine, and only then replaces the config's entries in the folder. Anything
+# else there (a README, .git) is left alone. If a check fails, nothing changes.
 #
 #   nu tasks/capture.nu
 
 use lib.nu *
+use userconfig.nu [ENTRIES local-folder config-problems]
 
 # What gets captured. Everything else in ~/.claude (projects, todos, logs,
 # login state in ~/.claude.json) is machine-local and never copied.
@@ -23,7 +26,6 @@ const MAC_ONLY = [
 ]
 
 const SECRET_NAME = '(?i)TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL'
-const SECRET_VALUE = 'sk-ant-[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|xox[baprs]-[A-Za-z0-9-]{10,}'
 
 # Remove a nested key if it is there.
 def drop-key [keys: list<string>]: record -> record {
@@ -42,19 +44,18 @@ def clean-settings []: record -> record {
   $MAC_ONLY | reduce --fold $settings {|keys, acc| $acc | drop-key $keys }
 }
 
-# The files under a folder whose text matches a pattern. Binary files are skipped.
-def files-matching [root: path, pattern: string]: nothing -> list<string> {
-  cd $root
-  glob "**/*" --no-dir | where {|file|
-    let text = try { open --raw $file | decode utf-8 } catch { "" }
-    $text =~ $pattern
+# The config's entries in a folder, as something that can be compared with ==.
+def snapshot [folder: path]: nothing -> list {
+  $ENTRIES | each {|entry|
+    let item = $folder | path join $entry
+    if ($item | path exists) { [$entry (contents $item)] } else { [$entry null] }
   }
 }
 
 def main [] {
   let src = claude-home
-  # RIG_CAPTURE_DEST is for the tests, which must not write into the repo.
-  let dest = $env.RIG_CAPTURE_DEST? | default (repo-dir | path join claude)
+  let dest = local-folder capture
+  if $dest == null { fail capture "no config folder yet. Make one: mise run config -- init <folder>" }
   if not ($src | path exists) { fail capture $"no Claude config at ($src)" }
 
   let tmp = mktemp --directory | path expand
@@ -79,30 +80,35 @@ def main [] {
   }
   do { cd $tmp; glob "**/.DS_Store" } | each {|file| rm $file }
 
-  let home = $nu.home-dir | str replace --all '\' '\\' | str replace --all '.' '\.'
-  for check in [
-    {found: (files-matching $tmp $SECRET_VALUE), problem: "possible secret in"}
-    {found: (files-matching $tmp $home), problem: $"a path under ($nu.home-dir) in"}
-  ] {
-    if ($check.found | is-not-empty) {
-      print --stderr $"capture: ($check.problem) these files \(claude/ was not changed):"
-      $check.found | each {|file| print --stderr $"  ($file | str replace $tmp $src)" }
-      rm --recursive --force $tmp
-      exit 1
+  let problems = config-problems $tmp
+  if ($problems | is-not-empty) {
+    for check in $problems {
+      print --stderr $"capture: ($check.problem) these files \(($dest) was not changed):"
+      $check.files | each {|file| print --stderr $"  ($src | path join $file)" }
     }
+    rm --recursive --force $tmp
+    exit 1
   }
 
-  # Replace claude/ with the checked copy (mirror: things removed on the Mac go too)
-  rm --recursive --force $dest
-  cp --recursive $tmp $dest
+  # Replace the config's entries with the checked copy (a mirror: what was
+  # removed here goes there too). Nothing else in the folder is touched.
+  mkdir $dest
+  let before = snapshot $dest
+  for entry in $ENTRIES {
+    let from = $tmp | path join $entry
+    let to = $dest | path join $entry
+    rm --recursive --force $to
+    if ($from | path exists) { cp --recursive $from $to }
+  }
   rm --recursive --force $tmp
 
-  let status = ^git -C (repo-dir) status --short -- claude | str trim
-  if $status == "" {
-    print "capture: already up to date."
+  if (snapshot $dest) == $before {
+    print $"capture: ($dest) is already up to date."
+  } else if ($dest | path join .git | path exists) {
+    print $"capture: ($dest) updated. Changes:"
+    print (^git -C $dest status --short | complete | get stdout | str trim)
+    print $"Review with: git -C ($dest) diff, then commit and push it."
   } else {
-    print "capture: claude/ updated. Changes:"
-    print $status
-    print "Review with: git diff -- claude"
+    print $"capture: ($dest) updated."
   }
 }

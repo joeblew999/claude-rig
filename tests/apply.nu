@@ -7,11 +7,15 @@
 #   nu tests/apply.nu
 
 const APPLY = path self ../tasks/apply.nu
-const RIG_CONFIG = path self ../claude
+# A made-up config, laid out like a user's config folder.
+const RIG_CONFIG = path self fixtures/config
 
-# Run apply against a Claude folder. Returns what it printed and its exit code.
+# Run apply against a Claude folder, with the test config named in RIG_CONFIG.
+# The rig's own folder is a throwaway one next to it, so this machine's
+# ~/.config/claude-rig is never read. Returns what it printed and its exit code.
 def apply [home: path, ...flags: string]: nothing -> record {
-  with-env { CLAUDE_HOME: $home, RIG_CHANGES: "0", RIG_DRY_RUN: "0" } {
+  let rig_home = $home | path dirname | path join rig-home
+  with-env { CLAUDE_HOME: $home, RIG_CONFIG: $RIG_CONFIG, RIG_CONFIG_HOME: $rig_home, RIG_CHANGES: "0", RIG_DRY_RUN: "0" } {
     ^$nu.current-exe $APPLY ...$flags | complete
   }
 }
@@ -38,7 +42,9 @@ def test-fresh-machine [root: path] {
   check "the first run succeeds" ($first.exit_code == 0)
   check "settings.json is the rig's" ((open --raw ($home | path join settings.json) | from json) == (open --raw ($RIG_CONFIG | path join settings.json) | from json))
   check "the rig's skills are there" ((names ($home | path join skills)) == (names ($RIG_CONFIG | path join skills)))
-  check "no backup is taken when nothing was there" ((names ($home | path dirname)) == [".claude"])
+  check "the commands are there" ((names ($home | path join commands)) == ["hello.md"])
+  check "CLAUDE.md is the rig's" ((open --raw ($home | path join CLAUDE.md)) == (open --raw ($RIG_CONFIG | path join CLAUDE.md)))
+  check "no backup is taken when nothing was there" ((names ($home | path dirname) | where {|name| $name starts-with ".claude" }) == [".claude"])
 
   let second = apply $home
   check "a second run changes nothing" ($second.stdout =~ "already up to date" and $second.stdout !~ '(?m)^ +change ')
@@ -47,8 +53,8 @@ def test-fresh-machine [root: path] {
 def test-existing-config [root: path] {
   print "a machine with its own Claude config"
   let home = $root | path join existing .claude
-  mkdir ($home | path join skills local-only) ($home | path join skills mise-tasks)
-  "old" | save ($home | path join skills mise-tasks SKILL.md)
+  mkdir ($home | path join skills local-only) ($home | path join skills alpha)
+  "old" | save ($home | path join skills alpha SKILL.md)
   "mine" | save ($home | path join skills local-only SKILL.md)
   {
     model: "sonnet"
@@ -71,12 +77,12 @@ def test-existing-config [root: path] {
   check "a list has no duplicates" (($settings.sandbox.excludedCommands | uniq | length) == ($settings.sandbox.excludedCommands | length))
 
   check "a skill that exists only here is left alone" ((open --raw ($home | path join skills local-only SKILL.md)) == "mine")
-  check "the rig's skill replaced the old one" ((open --raw ($home | path join skills mise-tasks SKILL.md)) != "old")
+  check "the rig's skill replaced the old one" ((open --raw ($home | path join skills alpha SKILL.md)) != "old")
 
   let backups = names ($home | path dirname) | where {|name| $name starts-with ".claude.rig-backup-" }
   check "one backup was taken" (($backups | length) == 1)
   let backup = $home | path dirname | path join $backups.0
-  check "the backup holds the old skill" ((open --raw ($backup | path join skills mise-tasks SKILL.md)) == "old")
+  check "the backup holds the old skill" ((open --raw ($backup | path join skills alpha SKILL.md)) == "old")
   check "the backup holds the old settings" ((open --raw ($backup | path join settings.json) | from json | get model) == "sonnet")
 
   let second = apply $home
@@ -84,9 +90,9 @@ def test-existing-config [root: path] {
   check "a second run takes no second backup" ((names ($home | path dirname) | where {|name| $name starts-with ".claude.rig-backup-" } | length) == 1)
 
   print "a skill changed on the machine"
-  "tampered" | save --append ($home | path join skills mise-tasks SKILL.md)
+  "tampered" | save --append ($home | path join skills alpha SKILL.md)
   let repair = apply $home
-  check "the changed skill is put back" ($repair.stdout =~ "update skills/mise-tasks" and $repair.stdout !~ "local-only")
+  check "the changed skill is put back" ($repair.stdout =~ "update skills/alpha" and $repair.stdout !~ "local-only")
 
   print "a skill the rig once installed and has since dropped"
   mkdir ($home | path join skills gone)

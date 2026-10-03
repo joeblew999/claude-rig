@@ -27,20 +27,24 @@ description = "Take this machine out of the fleet: stop the always-on session. P
 run = "nu tasks/unrig.nu"
 
 [tasks.apply]
-description = "Apply claude/ to this machine's ~/.claude. Pass --dry-run to only look."
+description = "Apply your config to this machine's ~/.claude. Pass --dry-run to only look."
 run = "nu tasks/apply.nu"
 
 [tasks.capture]
-description = "Copy this Mac's global Claude config (~/.claude) into claude/"
+description = "Copy this machine's global Claude config (~/.claude) into your config folder"
 run = "nu tasks/capture.nu"
+
+[tasks.config]
+description = "Where your Claude config comes from. mise run config -- init <folder> makes or picks the folder."
+run = "nu tasks/config.nu"
 
 [tasks.push]
 description = "Rig a remote machine over SSH: mise run push user@host. Pass --dry-run to only look."
 run = "nu tasks/push.nu"
 
 [tasks.test]
-description = "Run the tests: the config merge and the capture checks, against throwaway folders"
-run = ["nu tests/apply.nu", "nu tests/capture.nu"]
+description = "Run the tests: the config merge, the capture checks, and where the config comes from, against throwaway folders"
+run = ["nu tests/apply.nu", "nu tests/capture.nu", "nu tests/config.nu"]
 
 [tasks."plugin:check"]
 description = "Check the Claude Code plugin in plugin/ and the marketplace file with Claude Code's own validator (needs claude)"

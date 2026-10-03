@@ -1,0 +1,13 @@
+{
+  "model": "opus",
+  "permissions": {
+    "defaultMode": "acceptEdits"
+  },
+  "sandbox": {
+    "excludedCommands": [
+      "docker",
+      "git"
+    ]
+  },
+  "remoteControlAtStartup": true
+}
