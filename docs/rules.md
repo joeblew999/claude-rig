@@ -14,6 +14,7 @@ Binding, for people and agents alike.
 | **Safe to repeat.** Every step checks first and acts only if something is missing or wrong, through `change` in `tasks/lib.nu` | A second run must change nothing, and `--dry-run` must be exact |
 | **Two native scripts, then nushell.** `bootstrap.sh` and `bootstrap.ps1` only get git and mise and start the run. Never a second implementation for one OS | A change reaches every OS at once |
 | **Services run under pitchfork.** The OS's own service manager only where pitchfork cannot do it, with the reason written down | One way to run and inspect services |
+| **One source of truth.** Every fact has one owner and every interface one definition. Anything that talks to fleet-api goes through what charter generates from fleet-api's contract, never a hand-written copy ([Control plane](plans/control-plane.md#one-source-of-truth)) | A copy drifts; the owner wants a product, not an MVP |
 | **Public repo, no secrets.** Nothing personal or secret is committed; `capture` enforces it for a config, `mise run secrets:scan` for the repo, and secrets follow [Secrets](concepts/secrets.md) | Anyone can read this repo |
 | **Never destroy local state.** Back up before the first change, merge rather than overwrite, never copy or overwrite `~/.claude.json` | The machine is someone's |
 | **Say where it was tested.** CI runners, a container, a UTM VM, the Mac and a real PC are different things: name the one used. Results go in [Findings](findings.md) | A reader acts on it |
