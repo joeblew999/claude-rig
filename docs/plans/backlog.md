@@ -1,30 +1,13 @@
-# Backlog
+---
+title: Backlog
+nav_order: 1
+parent: Plans
+grand_parent: This repository
+---
 
-Every ask from the owner, and every loose end found while building. The rules for this file are in [AGENTS.md](../AGENTS.md).
+# Backlog: every open ask and loose end
 
-Status: `done`, `doing`, `next`, `later`, `needs owner`.
-
-## Done
-
-| Item | Where it was tested |
-|---|---|
-| Capture the Mac's Claude config into `claude/` | This Mac |
-| Bootstrap for macOS and Linux, one line with `curl` | CI on fresh macOS and Ubuntu (x64, ARM64); Ubuntu and Debian containers; this Mac |
-| Bootstrap for Windows, using winget for git and mise | CI on fresh Windows Server x64 and Windows 11 ARM64, and a fresh Windows 11 ARM64 VM in UTM (a clone of the irgo-winvm golden image) |
-| Tasks in nushell, one implementation for every OS | CI on all five runners |
-| `--dry-run` that changes nothing, even on a bare machine | CI on all five runners |
-| Login step: `claude auth login` with a claude.ai account | This Mac (already logged in). The login prompt itself has not been run on a new machine |
-| Always-on session under pitchfork, back after a reboot | This Mac: starts, shows in the Claude app, the rig restarts it when stopped. Not rebooted. Linux is the same code, not yet run on a real Linux machine with a login |
-| Always-on session on Windows, started at sign-in | CI on Windows x64 and ARM64, and the Windows 11 VM in UTM over SSH: the sign-in entry, the restart loop, the session surviving the SSH connection closing, a second run changing nothing, and a reboot (the VM signed in by itself and the session loop came back). The server connecting is not tested until that VM is logged in |
-| `push`: rig a remote machine over SSH from the Mac | Ubuntu containers over SSH, and the Windows 11 ARM64 VM in UTM set up like the office PC (OpenSSH Server, key in `administrators_authorized_keys`, cmd as the shell): dry run, real run from nothing, second run with no changes. CI also pushes from a Windows runner to its own SSH server (x64 and ARM64), with cmd and with PowerShell as the SSH shell. Not tested: a macOS remote, a machine whose sudo asks for a password, a Windows account that is not an administrator, a user name with a space in it |
-| One-line bootstrap on a real Linux machine with systemd | A fresh Ubuntu 24.04 VM in OrbStack, and then one in UTM. It stops at the login step, as designed |
-| `doctor`: a short report on the machine, and `--json` for a control plane | This Mac, and CI on all five runners |
-| `unrig`: take a machine out of the fleet | This Mac and the Windows 11 VM: unrig, unrig again (nothing to do), rig again (session back) |
-| `fleet`: every rigged machine in one table | This Mac, the Windows 11 VM and the Ubuntu VM, side by side. `push` adds a machine to the list; the list stays on the Mac, outside the repo |
-| First release: `v0.1.0`, a pre-release | Tagged on the commit where every CI job on main passed, including the ARM64 push test |
-| Tests (`mise run test`) | This Mac and CI on all five runners. The config merge: a fresh machine, a machine with its own config, a changed skill, a dropped skill, broken settings. Capture: secret-named settings and Mac-only keys dropped, synced skills left out, and a GitHub token, an Anthropic key, a private key or a path under the home folder each stop it with what was captured before untouched. Checked once for each that breaking the code fails the tests |
-| Licence: MIT, the same as the UTM repo | The lead chose it after asking twice; the owner can change it |
-| AGENTS.md and this backlog | |
+Every ask from the owner goes here when it is said, with its status. What is done leaves this page: its result goes to [Findings](../findings.md) and its description to the page of the part.
 
 ## Next
 
@@ -57,7 +40,7 @@ The owner has put this repo in the lead's hands too, and wants the two to fit to
 | Release the UTM repo | Done: `v0.6.0`, with the two changes above |
 | A command that runs a shell command in the guest and returns the output | `utmctl exec` returns neither output nor exit code. `app-create` does, but only for an `.exe` |
 | Linux VMs | Phase 1 is merged there: `irgo-winvm vm-create -os linux -vm <name> -install` makes an Ubuntu 24.04 ARM64 VM from Ubuntu's own cloud image in about a minute, and `vm-ssh-create` turns SSH on in 3 s. No R2 cache is needed for Linux. The rig's Linux test machine is now that: the UTM VM `claude-rig-linux`, rigged with `push` (dry run, real run, second run with no changes). The OrbStack VM is deleted. Later phases there: a Linux golden image and clones, running a Linux program in the guest, sealing OpenSSH into the Windows golden image |
-| How the repos fit together, and the UTM tool's name | A proposal is written: [2026-10-03-01-how-the-repos-fit.md](2026-10-03-01-how-the-repos-fit.md). Recommended: two products split by layer (provision, rig, control plane), the VM tool renamed, the glaze suite moved into Irgo. Needs the owner to pick |
+| How the repos fit together, and the UTM tool's name | A proposal is written: [2026-10-03-01-how-the-repos-fit.md](how-the-repos-fit.md). Recommended: two products split by layer (provision, rig, control plane), the VM tool renamed, the glaze suite moved into Irgo. Needs the owner to pick |
 | Run the rig before sealing the golden image | Plan step 6: every clone then starts as a rigged machine, and only needs its login |
 | Releases | The owner wants releases pushed for both repos, when the lead judges them ready |
 

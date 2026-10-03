@@ -1,4 +1,11 @@
-# 2026-10-03-01-how-the-repos-fit.md
+---
+title: How the repos fit
+nav_order: 2
+parent: Plans
+grand_parent: This repository
+---
+
+# How the repos fit together
 
 How claude-rig and the owner's other machine projects fit together, and what to decide so there are no loose ends. A proposal: nothing here is built until the owner picks.
 

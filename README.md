@@ -1,83 +1,16 @@
 # claude-rig
 
-Turn any Mac, Linux or Windows machine into a Claude coding machine you can control from the Claude app.
+[![test](https://github.com/joeblew999/claude-rig/actions/workflows/test.yml/badge.svg)](https://github.com/joeblew999/claude-rig/actions/workflows/test.yml)
+[![latest release](https://img.shields.io/github/v/release/joeblew999/claude-rig?include_prereleases)](https://github.com/joeblew999/claude-rig/releases/latest)
 
-It installs the tools, applies your global Claude config, and keeps a Claude session running. Every run is safe to repeat.
-
-## Rig a Mac or Linux machine
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.sh | sh
-```
-
-To see what it would change without changing anything, add `-s -- --dry-run` after `sh`.
-
-## Rig a Windows machine
-
-In PowerShell (no administrator rights needed):
-
-```powershell
-irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1 | iex
-```
-
-To only look:
-
-```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1))) -DryRun
-```
-
-## Rig a machine from the Mac, over SSH
+**Turn a Mac, a Linux box, a Windows PC or a fresh UTM VM into a Claude worker you give work to from your phone.** It installs your dev tools and Claude Code, copies in your Claude config and skills from your Mac, and keeps a Claude session running, so the machine shows up in the Claude app. Safe to re-run, and no secrets stored.
 
 ```sh
-mise run push user@host
+curl -fsSL https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.sh | sh                  # macOS, Linux
+irm https://raw.githubusercontent.com/joeblew999/claude-rig/main/bootstrap.ps1 | iex                       # Windows, in PowerShell
+mise run push -- user@host                                                                                  # any machine, from your Mac
 ```
 
-It works out which OS is on the other end and runs the right bootstrap there. The machine must accept your SSH key. Add `--dry-run` to only look. Tested against Linux and Windows machines; not yet against another Mac.
+Then: [Getting started](docs/getting-started.md). Everything else is in [the docs](docs/README.md) ([as a site](https://joeblew999.github.io/claude-rig/)).
 
-## See the whole fleet
-
-```sh
-mise run fleet
-```
-
-One table with this machine and every machine rigged from here with `push`: its OS, whether the tools are in, whether Claude is logged in, and whether the session is running. `mise run fleet -- add user@host` adds a machine that was rigged by hand. The list is kept in `~/.config/claude-rig/machines.json` on the Mac, not in this repo.
-
-## Give a machine work
-
-```sh
-mise run fleet -- run user@host "run the tests and tell me what fails"
-mise run fleet -- run --all "what version of node do you have?"
-```
-
-Claude runs the work on that machine, in its work folder (`~/work`), and the answer comes back here. `--all` gives every machine the same work at the same time. The machine must be logged in.
-
-## What a run does
-
-It installs git and mise if they are missing (with winget on Windows), the tools in [mise/claude-rig.toml](mise/claude-rig.toml), and Claude Code. Then it merges the config in [claude/](claude/) into `~/.claude`, after backing up what was there.
-
-Then it logs in and starts the always-on session:
-
-- **Login.** If the machine is not logged in, Claude prints a link. Open it on any device, approve, and paste the code back. This is the one step that needs you, once per machine.
-- **Session.** [pitchfork](https://pitchfork.jdx.dev) keeps `claude remote-control` running in `~/work` and brings it back after a reboot. The machine then shows up in the Claude app under its own name.
-
-On Windows, pitchfork cannot start at boot, so the session starts when the user signs in (a small file in the Startup folder) and restarts itself. A Windows machine that reboots with nobody signed in stays offline until someone signs in.
-
-`mise run doctor` (in `~/.claude-rig`) reports on the machine and shows what a run would change, without changing anything. `mise run doctor -- --json` prints the report as JSON.
-
-`mise run unrig` takes the machine out of the fleet: it stops the always-on session and removes what starts it. The tools, Claude Code, the config and the login stay, and running the rig again puts the session back. The design is in [the plan](.plans/2026-10-02-01-claude-rig.md), and what is done and what is next is in [the backlog](.plans/BACKLOG.md).
-
-## Update the config from the Mac
-
-```sh
-mise run capture
-```
-
-This copies the Mac's `~/.claude` settings and skills into `claude/`. Commit the result, and every machine picks it up on its next run.
-
-## Licence
-
-[MIT](LICENSE).
-
-## Credits
-
-`claude/skills/mise-configuration` and `claude/skills/mise-tasks` come from [terrylica/cc-skills](https://github.com/terrylica/cc-skills) (MIT).
+[MIT](LICENSE). `claude/skills/mise-configuration` and `claude/skills/mise-tasks` come from [terrylica/cc-skills](https://github.com/terrylica/cc-skills) (MIT).
