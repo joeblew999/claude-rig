@@ -27,7 +27,7 @@ Many agents and people will use the same machines, and inside the same VMs. Two 
 
 ## The token a machine needs
 
-A machine needs a write token to report. It is passed in when the machine is rigged (`push` sends it over SSH; the one line takes it from the environment) and kept on that machine only, readable by its user alone. It is never in this repo, the captured config, or a VM image: a golden image is sealed without it.
+Built (3 Oct 2026): fleet-api is behind Cloudflare Access, and each machine has its own Access service token, created by fleet-api's own `access:token` task when `push` enrols the machine, kept on that machine only (readable by its user alone), and revocable on its own. fleet-api maps the token to the one device it may post for. People reach fleet-api through Access with a GitHub login. No token is in this repo, the config, or a VM image; a golden image is sealed without one. End users of charter-built apps will log in through an OpenID provider: the recommendation is a new Better Auth service built as a charter project (see the backlog).
 
 ## Phases
 
