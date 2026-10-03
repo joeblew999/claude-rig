@@ -318,7 +318,13 @@ def test-awake [] {
       sleep 1sec
     }
     check "the keeper runs and the report sees it" $running
-    let requests = ^powercfg /requests | complete
+    # The keeper compiles its call first, so give it a few seconds to make it.
+    mut requests = ^powercfg /requests | complete
+    for attempt in 1..30 {
+      if $requests.exit_code != 0 or $requests.stdout =~ '(?i)powershell' { break }
+      sleep 1sec
+      $requests = ^powercfg /requests | complete
+    }
     if $requests.exit_code == 0 {
       print ($requests.stdout | lines | where {|line| $line =~ '(?i)SYSTEM|powershell' } | str join "\n")
       check "Windows lists it as holding the system awake" ($requests.stdout =~ '(?i)powershell')
