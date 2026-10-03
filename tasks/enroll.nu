@@ -68,10 +68,19 @@ def --env trust-work-dir [] {
   }
 }
 
+# The session script, named by the one path every machine has (~/.claude-rig)
+# when that is this rig, so a run from a checkout and a run from the link
+# describe the service the same way.
+def session-script []: nothing -> path {
+  let home_rig = $nu.home-dir | path join .claude-rig
+  let linked = ($home_rig | path exists) and ($home_rig | path expand) == (repo-dir | path expand)
+  if $linked { $home_rig | path join tasks session.nu } else { $env.FILE_PWD | path join session.nu }
+}
+
 # What pitchfork should run: this machine's session, restarted if it stops,
 # started again after a reboot.
 def daemon-wanted []: nothing -> record {
-  let script = $env.FILE_PWD | path join session.nu
+  let script = session-script
   {
     run: $"\"($nu.current-exe)\" \"($script)\""
     dir: (work-dir)
@@ -146,7 +155,7 @@ def startup-file []: nothing -> path {
 }
 
 def startup-wanted []: nothing -> string {
-  let script = $env.FILE_PWD | path join session.nu
+  let script = session-script
   [
     "@echo off"
     "rem Written by claude-rig. Starts the always-on Claude session with no window."
